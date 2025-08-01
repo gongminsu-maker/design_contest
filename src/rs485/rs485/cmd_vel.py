@@ -22,6 +22,7 @@ class MotorControllerNode(Node):
             timeout=1
         )
         #새로 변경한 내용!!!!
+        #다시 변경한 내용!!!!
 
         # 변수 선언
         self.declare_parameter("receiver","speed_feedback")
