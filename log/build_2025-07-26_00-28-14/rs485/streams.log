@@ -1,0 +1,27 @@
+[1.702s] Invoking command in '/home/gongminsu/motor_test/src/rs485': PYTHONPATH=/home/gongminsu/motor_test/build/rs485/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rs485 build --build-base /home/gongminsu/motor_test/build/rs485/build install --record /home/gongminsu/motor_test/build/rs485/install.log --single-version-externally-managed install_data
+[2.329s] running egg_info
+[2.330s] writing ../../build/rs485/rs485.egg-info/PKG-INFO
+[2.330s] writing dependency_links to ../../build/rs485/rs485.egg-info/dependency_links.txt
+[2.331s] writing entry points to ../../build/rs485/rs485.egg-info/entry_points.txt
+[2.331s] writing requirements to ../../build/rs485/rs485.egg-info/requires.txt
+[2.331s] writing top-level names to ../../build/rs485/rs485.egg-info/top_level.txt
+[2.342s] reading manifest file '../../build/rs485/rs485.egg-info/SOURCES.txt'
+[2.345s] writing manifest file '../../build/rs485/rs485.egg-info/SOURCES.txt'
+[2.345s] running build
+[2.345s] running build_py
+[2.345s] copying rs485/transceiver.py -> /home/gongminsu/motor_test/build/rs485/build/lib/rs485
+[2.346s] running install
+[2.347s] running install_lib
+[2.348s] copying /home/gongminsu/motor_test/build/rs485/build/lib/rs485/transceiver.py -> /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485
+[2.350s] byte-compiling /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/transceiver.py to transceiver.cpython-310.pyc
+[2.357s] running install_data
+[2.357s] running install_egg_info
+[2.362s] removing '/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info' (and everything under it)
+[2.362s] Copying ../../build/rs485/rs485.egg-info to /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info
+[2.364s] running install_scripts
+[2.415s] Installing cmd_vel script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+[2.415s] Installing id_baud script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+[2.416s] Installing receiver script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+[2.416s] Installing transceiver script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+[2.416s] writing list of installed files to '/home/gongminsu/motor_test/build/rs485/install.log'
+[2.499s] Invoked command in '/home/gongminsu/motor_test/src/rs485' returned '0': PYTHONPATH=/home/gongminsu/motor_test/build/rs485/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/rs485 build --build-base /home/gongminsu/motor_test/build/rs485/build install --record /home/gongminsu/motor_test/build/rs485/install.log --single-version-externally-managed install_data

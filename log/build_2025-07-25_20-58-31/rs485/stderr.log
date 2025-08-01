@@ -1,0 +1,4 @@
+/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/reciever.py:141: SyntaxWarning: 'bool' object is not callable; perhaps you missed a comma?
+  while True():
+/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/reciever.py:141: SyntaxWarning: 'bool' object is not callable; perhaps you missed a comma?
+  while True():
