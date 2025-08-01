@@ -75,8 +75,8 @@ class MotorControllerNode(Node):
         data_R = [checksum_R]+ [mode, self.direction, self.speed[0],self.speed[1],time_to_reach]
         full_packet_R = [self.header, self.motor_id, data_size , data_R]
         #Left motor
-        checksum_L = (~(self.motor_id + data_size + mode + abs(self.direction-1) + self.speed[0] + self.speed[1] + time_to_reach)) & 0xFF
-        data_L = [checksum_L] + [mode, abs(self.direction-1), self.speed[0], self.speed[1], time_to_reach]
+        checksum_L = (~(self.motor_id + data_size + mode + int(abs(self.direction-1)) + self.speed[0] + self.speed[1] + time_to_reach)) & 0xFF
+        data_L = [checksum_L] + [mode, int(abs(self.direction-1)), self.speed[0], self.speed[1], time_to_reach]
         full_packet_L = [self.header, self.motor_id , data_size, data_L]
 
         # 전송
