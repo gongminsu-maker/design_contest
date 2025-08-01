@@ -150,7 +150,8 @@ def main(args=None):
     except KeyboardInterrupt:
         node.get_logger().info("keyboardinterrupt!!")
     finally:
-        node.ser.close()    #시리얼 닫기
+        node.ser_L.close()    #시리얼 닫기
+        node.ser_R.close()
         node.destroy_node() #노드 닫기
         rp.shutdown()
 
