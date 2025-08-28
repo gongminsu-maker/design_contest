@@ -9,7 +9,7 @@ from builtin_interfaces.msg import Duration
 from sensor_msgs.msg import Imu
 from tf_transformations import euler_from_quaternion
 from rclpy.duration import Duration as rclpyDuration  # timeout용
-
+# test
 class BaseBroad(Node):
     
     def __init__(self):
