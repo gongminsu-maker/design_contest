@@ -1,6 +1,13 @@
 [console_scripts]
+TSS_test = rs485.TSS_test:main
+base_broad = rs485.base_broad:main
+base_broad_imu = rs485.base_broad_imu:main
 cmd_vel = rs485.cmd_vel:main
+co = rs485.co
 id_baud = rs485.id_baud:main
+node = rs485.node:main
 receiver = rs485.receiver:main
+testcode = rs485.testcode:main
 transceiver = rs485.transceiver:main
+zmp_test_imu = rs485.zmp_test_imu:main
 

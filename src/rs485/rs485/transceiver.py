@@ -16,11 +16,11 @@ class Transceiver(Node):
             timeout=1
         )
         # 파라미터 선언
-        self.declare_parameter('mode',0x01)
+        self.declare_parameter('mode',0x03)
         #01(위치, 속도제어), 02(가감속 위치제어), 03(가감속 속도제어), 04(위치 제어기 설정), 05(속도 제어기 설정)
         #06(ID설정), 07(통신 속도 설정), 08(통신 응답시간 설정), 09(외부 감속비 설정), 0A(제어 on/off 설정), 0B(위치제어 모드 설정)
         #0C(위치 초기화), #0D(공장 초기화)
-        self.declare_parameter('transceiver',"pos_vel") 
+        self.declare_parameter('transceiver',"acdc_speed") 
         #01(위치 피드백), 02(가감속 위치제어), 03(가감속 속도제어), 04(위치 제어기 설정), 05(속도 제어기 설정)
         #06(ID설정), 07(통신 속도 설정), 08(통신 응답시간 설정), 09(외부 감속비 설정), 0A(제어 on/off 설정), 0B(위치제어 모드 설정)
         #0C(위치 초기화), #0D(공장 초기화)
@@ -70,7 +70,7 @@ class Transceiver(Node):
         self.init_pose()
         data_size = 0x07      
         direction = 0x00 # CCW(00), CW(01)
-        pose_degree= 0x0000 # 0x2328 = 90, 0x4650 = 180, 0x8CA0 = 360 스탭단위 0.01 degree
+        pose_degree= 0x0020 # 0x2328 = 90, 0x4650 = 180, 0x8CA0 = 360 스탭단위 0.01 degree
         MSB_p = (pose_degree >> 8) & 0xFF
         LSB_p = pose_degree & 0xFF
         speed = 0x0032 # 0x0032 = 5RPM , 스탭 단위 0.1 rpm
@@ -213,11 +213,12 @@ class Transceiver(Node):
 
     #0D 공장 초기화
     def init_factory(self):
-        data_size = 0x03
-        init_fact = 0x0D      
-        checksum = (~(self.motor_id + data_size + self.mode + init_fact)) & 0xFF
-        data = [checksum, self.mode, init_fact]
-        full_packet = self.header + [self.motor_id, data_size] + data
+        data_size = 0x02
+        init_fact = 0x0D 
+        broad_id = 0xFF     
+        checksum = (~(broad_id + data_size + init_fact)) & 0xFF
+        data = [checksum, init_fact]
+        full_packet = self.header + [broad_id, data_size] + data
 
         #전송
         self.ser.write(bytearray(full_packet))

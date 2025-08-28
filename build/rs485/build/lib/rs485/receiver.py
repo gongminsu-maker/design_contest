@@ -50,7 +50,7 @@ class Receiver(Node):
         #전송
         self.ser.write(bytearray(full_packet))
         self.get_logger().info(f"[TX] {[ hex(b) for b in full_packet]}")
-    
+
     def ping(self):
         while True:
             response = self.ser.read(6)

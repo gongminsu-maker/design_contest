@@ -1,6 +1,6 @@
-low_number = 0b10000000
-high_humber = low_number << 8
-number = high_humber & low_number
-print(bin(low_number))
-print(bin(high_humber))
-print(bin(number))
+a = 100
+b = 20
+c = 30
+d = [a,b,c]
+f = 0x64
+print(f)
