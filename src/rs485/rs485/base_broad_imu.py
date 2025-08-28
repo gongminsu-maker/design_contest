@@ -135,9 +135,9 @@ class BaseBroad(Node):
         h = 0.135
         x = -0.1
         M = 25.0
-        v = 0.0
-        w = 0.0
-        t = 0.5
+        v = 0.0    # 최대속도 0.2m/s
+        w = 0.0    # 최대각속도 0.8rad/s
+        t = 0.5    # 도달시간 디폴드값
 
         omega = np.array([0.0, 0.0, w])
         alpha = np.array([0.0, 0.0, w / t])
@@ -145,7 +145,7 @@ class BaseBroad(Node):
         CoG_a_local = np.array([v / t, 0.0, 0.0])
         # 지면 기울기 반영 world에서 base의 좌표계 회전을 listen해서 th, psi갱신
         try:
-            # world좌표계를 base좌표계 기준으로 바라봄
+            # world를 base기준으로 바라봄
             tf = self.tf_buffer.lookup_transform("base", "world", rp.time.Time(), timeout=rclpyDuration(seconds=0.2))
             rot = tf.transform.rotation
             q = [rot.x, rot.y, rot.z, rot.w]
@@ -153,15 +153,18 @@ class BaseBroad(Node):
         except Exception as e:
             self.get_logger().warn(f"TF lookup failed for world → base: {e}")
             return
-        th = R[1]   # pitch
+
         psi = R[0]  # Roll
+        th = R[1]   # pitch
+        yaw = R[2]  # yaw
 
         R_pitch = np.array([[math.cos(th), 0, math.sin(th)], [0, 1, 0], [-math.sin(th), 0, math.cos(th)]])
         R_roll = np.array([[1, 0, 0], [0, math.cos(psi), -math.sin(psi)], [0, math.sin(psi), math.cos(psi)]])
-        R = R_pitch @ R_roll  
+        R_yaw = np.array([[math.cos(yaw),-math.sin(yaw), 0],[math.sin(yaw),math.cos(yaw),0],[0,0,1]])
+        R_world_to_local = R_yaw @ R_pitch @ R_roll  # ros회전변환순서 ZYX
 
         g_world = np.array([0.0, 0.0, g])
-        g_local = R @ g_world    # base에서 world를 바라봄
+        g_local = R_world_to_local @ g_world 
  
         x_nf = (M * g_local[2] * CoG_local[0] - M * g_local[0] * CoG_local[2]) / (M * g_local[2])
         y_nf = (M * g_local[2] * CoG_local[1] - M * g_local[1] * CoG_local[2]) / (M * g_local[2])
