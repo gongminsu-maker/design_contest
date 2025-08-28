@@ -147,7 +147,7 @@ class BaseBroad(Node):
         # 지면 기울기 반영 world에서 base의 좌표계 회전을 listen해서 th, psi갱신
         try:
             # world를 base기준으로 바라봄
-            tf = self.tf_buffer.lookup_transform("world", "base", rp.time.Time(), timeout=rclpyDuration(seconds=0.2))
+            tf = self.tf_buffer.lookup_transform("base", "world", rp.time.Time(), timeout=rclpyDuration(seconds=0.2))
             rot = tf.transform.rotation
             q = [rot.x, rot.y, rot.z, rot.w]
             #R = euler_from_quaternion(q)
