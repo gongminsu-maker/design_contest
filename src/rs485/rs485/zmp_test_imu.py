@@ -48,37 +48,12 @@ class BaseBroad(Node):
         self.tf.sendTransform(transforms)   # static broad
 
     def callback_imu(self,msg):
-        self.quater_x = msg.orientation.x
-        self.quater_y = msg.orientation.y
-        self.quater_z = msg.orientation.z
-        self.quater_w = msg.orientation.w
-
-    def broad_tilted_ground(self):       # world -> tilted ground (broadcaster)
-        # theta 방향 갱신
-        dtheta = 0.01
-        self.theta_tilted += self.tilted_direct * dtheta
-
-        # 범위 초과 시 방향 반전
-        if self.theta_tilted <= self.theta_min or self.theta_tilted >= self.theta_max:
-            self.tilted_direct *= -1
-
-        # ground 회전 (Roll & Pitch)
-        q = quaternion_from_euler(self.theta_tilted, 0,0)
-
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "world"   
-        t.child_frame_id = "tilted_ground"
-        t.transform.translation.x = 0.0
-        t.transform.translation.y = 0.0
-        t.transform.translation.z = 0.0
-        t.transform.rotation.x = q[0]      # 후에 imu센서를 사용하여 데이터값 사용
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
-
+        self.qx  = msg.orientation.x
+        self.qy = msg.orientation.y
+        self.qz = msg.orientation.z
+        self.qw = msg.orientation.w
         self.broad_base()
-        self.tf_base.sendTransform(t)
+
      
     def broad_base(self):                # tilted ground -> base (broadcaster)
         # 조향 방향 갱신
@@ -94,15 +69,15 @@ class BaseBroad(Node):
 
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "tilted_ground"
+        t.header.frame_id = "world"
         t.child_frame_id = "base"
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
+        t.transform.rotation.x = self.qx
+        t.transform.rotation.y = self.qy
+        t.transform.rotation.z = self.qz
+        t.transform.rotation.w = self.qw
 
         self.draw_marker("base","robtf", 1, -0.1, 0.0, 0.135, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 1.0, 0.0], 0.1)
         self.draw_rectangle_marker()
