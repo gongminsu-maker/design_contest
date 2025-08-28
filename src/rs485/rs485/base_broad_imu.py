@@ -26,7 +26,7 @@ class BaseBroad(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-        self.timer = self.create_timer(0.15, self.broad_base)
+        #self.timer = self.create_timer(0.15, self.broad_base)
 
         transforms = []
         transforms.append(self.robot_broad("CoG", -0.1, 0.0, 0.135))
@@ -41,6 +41,7 @@ class BaseBroad(Node):
         self.qy = msg.orientation.y
         self.qz = msg.orientation.z
         self.qw = msg.orientation.w
+        self.broad_base()
 
      
     def broad_base(self):            
