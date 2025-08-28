@@ -8,6 +8,7 @@ from visualization_msgs.msg import Marker
 from builtin_interfaces.msg import Duration
 from sensor_msgs.msg import Imu
 from tf_transformations import euler_from_quaternion
+from tf_transformations import quaternion_matrix
 from rclpy.duration import Duration as rclpyDuration  # timeout용
 # test
 class BaseBroad(Node):
@@ -149,20 +150,20 @@ class BaseBroad(Node):
             tf = self.tf_buffer.lookup_transform("base", "world", rp.time.Time(), timeout=rclpyDuration(seconds=0.2))
             rot = tf.transform.rotation
             q = [rot.x, rot.y, rot.z, rot.w]
-            R = euler_from_quaternion(q)
+            #R = euler_from_quaternion(q)
         except Exception as e:
             self.get_logger().warn(f"TF lookup failed for world → base: {e}")
             return
 
-        psi = R[0]  # Roll
-        th = R[1]   # pitch
-        yaw = R[2]  # yaw
+        # psi = R[0]  # Roll
+        # th = R[1]   # pitch
+        # yaw = R[2]  # yaw
 
-        R_pitch = np.array([[math.cos(th), 0, math.sin(th)], [0, 1, 0], [-math.sin(th), 0, math.cos(th)]])
-        R_roll = np.array([[1, 0, 0], [0, math.cos(psi), -math.sin(psi)], [0, math.sin(psi), math.cos(psi)]])
-        R_yaw = np.array([[math.cos(yaw),-math.sin(yaw), 0],[math.sin(yaw),math.cos(yaw),0],[0,0,1]])
-        R_world_to_local = R_yaw @ R_pitch @ R_roll  # ros회전변환순서 ZYX
-
+        # R_pitch = np.array([[math.cos(th), 0, math.sin(th)], [0, 1, 0], [-math.sin(th), 0, math.cos(th)]])
+        # R_roll = np.array([[1, 0, 0], [0, math.cos(psi), -math.sin(psi)], [0, math.sin(psi), math.cos(psi)]])
+        # R_yaw = np.array([[math.cos(yaw),-math.sin(yaw), 0],[math.sin(yaw),math.cos(yaw),0],[0,0,1]])
+        # R_world_to_local = R_yaw @ R_pitch @ R_roll  # ros회전변환순서 ZYX
+        R_world_to_local = quaternion_matrix(q)[:3,:3]
         g_world = np.array([0.0, 0.0, g])
         g_local = R_world_to_local @ g_world 
  
