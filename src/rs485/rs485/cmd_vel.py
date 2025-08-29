@@ -13,7 +13,7 @@ class MotorControllerNode(Node):
 
         self.L = 0.5 #휠간격
         # 키보드 속도 명령 수신
-        self.sub = self.create_subscription(Twist,"/revised/cmd_vel",self.motor_control,10)
+        self.sub = self.create_subscription(Twist,"/cmd_vel",self.motor_control,10)
         # 모터 상태 pub
         self.pub = self.create_publisher(Twist,"/motor/cmd_vel")
         self.timer = self.create_timer(0.1, self.motor_state)     # 10HZ
