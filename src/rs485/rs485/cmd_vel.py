@@ -38,9 +38,9 @@ class MotorControllerNode(Node):
         )
 
         # 변수 선언
-        self.declare_parameter("receiver","speed_feedback")
-        self.receiver = self.get_parameter("receiver").get_parameter_value().string_value
-        receiver_func = getattr(self, self.receiver)
+        # self.declare_parameter("receiver","speed_feedback")
+        # self.receiver = self.get_parameter("receiver").get_parameter_value().string_value
+        # receiver_func = getattr(self, self.receiver)
 
         # 헤더 & ID
         self.header = [0xFF, 0xFE]
