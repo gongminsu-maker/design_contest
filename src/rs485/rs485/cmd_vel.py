@@ -74,20 +74,20 @@ class MotorControllerNode(Node):
 
         self.speed_int_R = abs(int(rpm*10))              # 계산된 rpm을 실제 프로토콜에 맞는 rpm으로 변환 ex(1300rpm을 명령하면 130rpm으로 돈다)
         return self.speed_int_R   
-
     def cal_speed_L(self, v):
-       rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
-       if v != 0:
-           if v > 0:
-               self.direction_L = 0x00
+        rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
+        if v != 0:
+            if v > 0:
+                self.direction_L = 0x01
 
-           else:
-               self.direction_L = 0x01
-       else:
-           # self.direction_L = 0x00
+            else:
+                self.direction_L = 0x00
+        else:
+            self.direction_L = 0x00
 
         self.speed_int_L = abs(int(rpm*10))              # 계산된 rpm을 실제 프로토콜에 맞는 rpm으로 변환 ex(1300rpm을 명령하면 130rpm으로 돈다)
-        return self.speed_int_L                     
+        return self.speed_int_L   
+                  
 
         
     def motor_control(self,msg):
