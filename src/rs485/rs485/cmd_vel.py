@@ -15,8 +15,8 @@ class MotorControllerNode(Node):
         # 키보드 속도 명령 수신
         self.sub = self.create_subscription(Twist,"/cmd_vel",self.motor_control,10)
         # 모터 상태 pub
-        self.speed_R = 0
-        self.speed_L = 0
+        self.speed_R_RX = 0
+        self.speed_L_RX= 0
         self.pub = self.create_publisher(Twist,"/motor/cmd_vel",10)
         self.timer = self.create_timer(0.1, self.motor_state)     # 10HZ
         
@@ -152,11 +152,11 @@ class MotorControllerNode(Node):
             if response and len(response) >= 12:
                 header = response[0:2]
                 data_size = response[3]
-                self.speed_R = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
+                self.speed_R_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
                 position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
                 current = response[11] * 0.1 #100mA , 0.1A
                 if header == b'\xFF\xFE'  and data_size == 0x08:
-                    self.get_logger().info(f"[RX_R] Speed: {self.speed_R:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
+                    self.get_logger().info(f"[RX_R] Speed: {self.speed_R_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
                 else:
                     self.get_logger().warn(f"[RX_R] Unexpected response")
             else:
@@ -169,11 +169,11 @@ class MotorControllerNode(Node):
             if response and len(response) >= 12:
                 header = response[0:2]
                 data_size = response[3]
-                self.speed_L = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
+                self.speed_L_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
                 position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
                 current = response[11] * 0.1 #100mA , 0.1A
                 if header == b'\xFF\xFE'  and data_size == 0x08:
-                    self.get_logger().info(f"[RX_L] Speed: {self.speed_L:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
+                    self.get_logger().info(f"[RX_L] Speed: {self.speed_L_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
                 else:
                     self.get_logger().warn(f"[RX_L] Unexpected response")
             else:
@@ -182,8 +182,8 @@ class MotorControllerNode(Node):
 
     def motor_state(self):
         motor = Twist()
-        m_vel_R = self.speed_R*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 
-        m_vel_L = self.speed_L*(2*m.pi/60)*self.radius
+        m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 
+        m_vel_L = self.speed_L_RX*(2*m.pi/60)*self.radius
         m_vel = (m_vel_R + m_vel_L)/2    # 선속도
         m_ang = (m_vel_R - m_vel_L)/(self.width)
         motor.linear.x = m_vel
