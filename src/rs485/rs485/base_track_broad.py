@@ -70,8 +70,8 @@ class BaseBroad(Node):
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "base"
         t.child_frame_id = "track_Right"
-        t.transform.translation.x = 0.297
-        t.transform.translation.y = 0.0
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = -0.314
         t.transform.translation.z = 0.135
         t.transform.rotation.x = 0.0
         t.transform.rotation.y = 0.0
