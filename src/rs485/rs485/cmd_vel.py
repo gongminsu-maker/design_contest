@@ -18,13 +18,13 @@ class MotorControllerNode(Node):
         self.speed_R_RX = 0
         self.speed_L_RX= 0
         self.pub = self.create_publisher(Twist,"/motor/cmd_vel",10)
-        self.timer = self.create_timer(0.1, self.motor_state)     # 10HZ
+        self.timer_state = self.create_timer(0.1, self.motor_state)     # 10HZ
         
 
         # serial setting
         self.ser_R = serial.Serial(
             port='/dev/ttyUSB0',         # 적절한 포트로 수정 (ls /dev/ttyUSB*을 통해 포트번호 확인하기)
-            baudrate=9600,
+            baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
             stopbits=serial.STOPBITS_ONE,
@@ -32,7 +32,7 @@ class MotorControllerNode(Node):
         )
         self.ser_L = serial.Serial(
            port="/dev/ttyUSB1",
-           baudrate=9600,
+           baudrate=115200,
            bytesize=serial.EIGHTBITS,
            parity=serial.PARITY_NONE,
            stopbits=serial.STOPBITS_ONE,
@@ -47,9 +47,11 @@ class MotorControllerNode(Node):
         # 헤더 & ID
         self.header = [0xFF, 0xFE]
         self.motor_id = 0x00
+        self.direction_L = 0x00    # 초기 direction값
+        self.direction_R = 0x00
 
         # 피드백 요청 timer
-        self.timer = self.create_timer(0.05, self.request_feedback) #20HZ  motor_state publisher보다 빠르게 설정
+        self.timer_request = self.create_timer(0.05, self.request_feedback) #20HZ  motor_state publisher보다 빠르게 설정
 
         # 백그라운드 수신 쓰레드 시작
         self.receiver_thread_R = threading.Thread(target=self.speed_feedback_R, daemon=True)
@@ -60,15 +62,34 @@ class MotorControllerNode(Node):
         # 로봇 세팅값
         self.radius = 0.135                            # [m]이며 실제 로봇 휠 반지름
         self.width = 0.5                               # [m] 휠간거리
+    def _parse_one_frame(self,buf:bytearray):
+        # 수신 packet 형태
+        # header[0:1] + id[2] + datasize[3] + data[4:12] 총 12byte의 패킷
+        while True:
+            if len(buf) < 4:
+                return None # _parse_one_frame을 멈춤 buf가 더 쌓이길 기다림
+            if buf[0] == self.header[0] and buf[1] == self.header[1]:
+                break
+            buf.pop(0) # 데이터는 충분히 들어왔는데 헤더가 맞지 않는다면 바이트를 버리면서 동기화
+        data_size = buf[3]  # 속도 수신의 경우 data_size가 0x08 = payload가 8byte임을 알 수 있음
+        total_len = 2 + 1 + 1+ data_size  # header + id + size + payload(Data)
+
+        if len(buf) < total_len:  # 프레임이 다 들어오지 않았다면 더 대기
+            return None
+        
+        frame = bytes(buf[:total_len]) # 총 12바이트를 반환함
+        del buf[:total_len]
+        return frame
+
 
     def cal_speed_R(self, v):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_R = 0x01
+                self.direction_R = 0x00
 
             else:
-                self.direction_R = 0x00
+                self.direction_R = 0x01
         else:
             self.direction_R = 0x00
 
@@ -86,9 +107,65 @@ class MotorControllerNode(Node):
             self.direction_L = 0x00
 
         self.speed_int_L = abs(int(rpm*10))              # 계산된 rpm을 실제 프로토콜에 맞는 rpm으로 변환 ex(1300rpm을 명령하면 130rpm으로 돈다)
-        return self.speed_int_L   
-                  
+        return self.speed_int_L
 
+    def speed_feedback_R(self):
+        self.ser_R.timeout = 0.05 # in_waiting,1을 해도 바이트가 없을 때 0.05초 기다림
+        buf = bytearray() # 바이트 저장공간
+        while True:
+            try:
+                n = max(self.ser_R.in_waiting,1) # os버퍼에서 쌓여있는 바이트를 확인 없으면 최소 1바이트를 읽을 수 있게 timeout동안 기다림
+
+                chunk = self.ser_R.read(n)
+                if chunk:
+                    buf.extend(chunk)
+
+                while True:
+                    frame = self._parse_one_frame(buf)
+                    if frame is None:
+                        break
+                    payload = frame[4:]
+                    if len(payload) <8 :
+                        self.get_logger().warn("[RX_R] Payload too short; skipping")
+                        continue
+                    speed_rpm_01 = ((payload[3] << 8) | payload[4] ) * 0.1
+                    # pos랑 전류는 필요하면 사용
+                    # pos_deg_01 = ((payload[5] << 8) | payload[6]) * 0.1
+                    # current_A_01 = payload[7] * 0.1
+                    self.speed_R_RX = speed_rpm_01
+            except Exception as e:
+                self.get_logger().warn(f"[RX_R] Exception: {e}")
+
+            time.sleep(0.005)
+
+    def speed_feedback_L(self):
+        self.ser_L.timeout = 0.05 # in_waiting,1을 해도 바이트가 없을 때 0.05초 기다림
+        buf = bytearray() # 바이트 저장공간
+        while True:
+            try:
+                n = max(self.ser_L.in_waiting,1) # os버퍼에서 쌓여있는 바이트를 확인 없으면 최소 1바이트를 읽을 수 있게 timeout동안 기다림
+
+                chunk = self.ser_L.read(n)
+                if chunk:
+                    buf.extend(chunk)
+
+                while True:
+                    frame = self._parse_one_frame(buf)
+                    if frame is None:
+                        break
+                    payload = frame[4:]
+                    if len(payload) <8 :
+                        self.get_logger().warn("[RX_L] Payload too short; skipping")
+                        continue
+                    speed_rpm_01 = ((payload[3] << 8) | payload[4] ) * 0.1
+                    # pos랑 전류는 필요하면 사용
+                    # pos_deg_01 = ((payload[5] << 8) | payload[6]) * 0.1
+                    # current_A_01 = payload[7] * 0.1
+                    self.speed_L_RX = speed_rpm_01
+            except Exception as e:
+                self.get_logger().warn(f"[RX_L] Exception: {e}")
+
+            time.sleep(0.005)
         
     def motor_control(self,msg):
         lin_v = float(msg.linear.x)
@@ -104,10 +181,10 @@ class MotorControllerNode(Node):
         self.speed_R = [MSB_R, LSB_R]                      #hex()로하면 문자열임으로 패킷 구성시 사칙연산이 불가능하다. 따라서 [MSB,LSB]로한다
         MSB_L= (self.speed_int_L >> 8) & 0xFF              # 상위 byte
         LSB_L = self.speed_int_L & 0xFF                    # 하위 byte
-        self.speed_L = [MSB_L, LSB_L]                      #hex()로하면 문자열임으로 패킷 구성시 사칙연산이 불가능하다. 따라서 [MSB,LSB]로한다
+        self.speed_L = [MSB_L, LSB_L]                 #hex()로하면 문자열임으로 패킷 구성시 사칙연산이 불가능하다. 따라서 [MSB,LSB]로한다
 
         self.send_motor_command()
-            
+
     def send_motor_command(self):
         # 프로토콜 구성
         data_size = 0x06
@@ -146,49 +223,52 @@ class MotorControllerNode(Node):
         self.ser_L.write(bytearray(full_packet_L))
         self.get_logger().info(f"[TX] {[ hex(b) for b in full_packet_R]}")
 
-    def speed_feedback_R(self):
-        while True:
-            response = self.ser_R.read(12)
-            if response and len(response) >= 12:
-                header = response[0:2]
-                data_size = response[3]
-                self.speed_R_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
-                position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
-                current = response[11] * 0.1 #100mA , 0.1A
-                if header == b'\xFF\xFE'  and data_size == 0x08:
-                    self.get_logger().info(f"[RX_R] Speed: {self.speed_R_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
-                else:
-                    self.get_logger().warn(f"[RX_R] Unexpected response")
-            else:
-                self.get_logger().warn("[RX_R] Ping: Incomplete response")   
-            time.sleep(0.01)  # CPU 낭비 방지용 짧은 대기
-
-    def speed_feedback_L(self):
-        while True:
-            response = self.ser_L.read(12)
-            if response and len(response) >= 12:
-                header = response[0:2]
-                data_size = response[3]
-                self.speed_L_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
-                position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
-                current = response[11] * 0.1 #100mA , 0.1A
-                if header == b'\xFF\xFE'  and data_size == 0x08:
-                    self.get_logger().info(f"[RX_L] Speed: {self.speed_L_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
-                else:
-                    self.get_logger().warn(f"[RX_L] Unexpected response")
-            else:
-                self.get_logger().warn("[RX_L] Ping: Incomplete response")   
-            time.sleep(0.01)  # CPU 낭비 방지용 짧은 대기
 
     def motor_state(self):
         motor = Twist()
         m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 
         m_vel_L = self.speed_L_RX*(2*m.pi/60)*self.radius
+        self.get_logger().info(f"R_RX{self.speed_R_RX}, L_LX{self.speed_L_RX}")
         m_vel = (m_vel_R + m_vel_L)/2    # 선속도
         m_ang = (m_vel_R - m_vel_L)/(self.width)
         motor.linear.x = m_vel
         motor.angular.z = m_ang
         self.pub.publish(motor)
+
+    # def speed_feedback_R(self):
+    #     while True:
+    #         response = self.ser_R.read(12)
+    #         if response and len(response) >= 12:
+    #             header = response[0:2]
+    #             data_size = response[3]
+    #             self.speed_R_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
+    #             position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
+    #             current = response[11] * 0.1 #100mA , 0.1A
+    #             if header == b'\xFF\xFE'  and data_size == 0x08:
+    #                 self.get_logger().info(f"[RX_R] Speed: {self.speed_R_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
+    #             else:
+    #                 self.get_logger().warn(f"[RX_R] Unexpected response")
+    #         else:
+    #             self.get_logger().warn("[RX_R] Ping: Incomplete response")   
+    #         time.sleep(0.01)  # CPU 낭비 방지용 짧은 대기
+
+    # def speed_feedback_L(self):
+    #     while True:
+    #         response = self.ser_L.read(12)
+    #         if response and len(response) >= 12:
+    #             header = response[0:2]
+    #             data_size = response[3]
+    #             self.speed_L_RX = ((response[7] << 8) | response[8]) * 0.1     # 0.1 [rpm]
+    #             position = ((response[9] << 8) | response[10]) * 0.1 # 0.1 [degree]
+    #             current = response[11] * 0.1 #100mA , 0.1A
+    #             if header == b'\xFF\xFE'  and data_size == 0x08:
+    #                 self.get_logger().info(f"[RX_L] Speed: {self.speed_L_RX:.1f} RPM, Pos: {position:.1f}°, Current: {current:.1f} A")
+    #             else:
+    #                 self.get_logger().warn(f"[RX_L] Unexpected response")
+    #         else:
+    #             self.get_logger().warn("[RX_L] Ping: Incomplete response")   
+    #         time.sleep(0.01)  # CPU 낭비 방지용 짧은 대기
+
 
 
 

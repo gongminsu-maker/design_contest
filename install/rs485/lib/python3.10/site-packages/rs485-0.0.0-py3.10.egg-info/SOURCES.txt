@@ -20,6 +20,7 @@ rs485/motor_state.py
 rs485/node.py
 rs485/python.py
 rs485/receiver.py
+rs485/serial_test.py
 rs485/testcode.py
 rs485/transceiver.py
 rs485/zmp_test_imu.py

@@ -31,6 +31,7 @@ setup(
             "zmp_test_imu = rs485.zmp_test_imu:main",
             "TSS_test = rs485.TSS_test:main",
             "base_broad_imu = rs485.base_broad_imu:main",
+            "base_track_broad = rs485.base_track_broad:main",
 
             
         ],

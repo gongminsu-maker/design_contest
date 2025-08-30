@@ -4,6 +4,7 @@
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/id_baud.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/cmd_vel.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__init__.py
+/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/serial_test.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/bit.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/python.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/node.py
@@ -18,6 +19,7 @@
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/id_baud.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/cmd_vel.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/__init__.cpython-310.pyc
+/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/serial_test.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/bit.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/python.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/node.cpython-310.pyc

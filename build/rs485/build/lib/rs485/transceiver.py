@@ -16,11 +16,11 @@ class Transceiver(Node):
             timeout=1
         )
         # 파라미터 선언
-        self.declare_parameter('mode',0x03)
+        self.declare_parameter('mode',0x07)
         #01(위치, 속도제어), 02(가감속 위치제어), 03(가감속 속도제어), 04(위치 제어기 설정), 05(속도 제어기 설정)
         #06(ID설정), 07(통신 속도 설정), 08(통신 응답시간 설정), 09(외부 감속비 설정), 0A(제어 on/off 설정), 0B(위치제어 모드 설정)
         #0C(위치 초기화), #0D(공장 초기화)
-        self.declare_parameter('transceiver',"acdc_speed") 
+        self.declare_parameter('transceiver',"tel_velocity") 
         #01(위치 피드백), 02(가감속 위치제어), 03(가감속 속도제어), 04(위치 제어기 설정), 05(속도 제어기 설정)
         #06(ID설정), 07(통신 속도 설정), 08(통신 응답시간 설정), 09(외부 감속비 설정), 0A(제어 on/off 설정), 0B(위치제어 모드 설정)
         #0C(위치 초기화), #0D(공장 초기화)
@@ -162,7 +162,7 @@ class Transceiver(Node):
     #07 통신 속도 설정
     def tel_velocity(self):
         data_size = 0x03
-        baudrate = 0x06 # 초기값 0x06 (9600), 부록 참고      
+        baudrate = 0x0D # 초기값 0x06 (9600), 0x0D (115200) 부록 참고      
         checksum = (~(self.motor_id + data_size + self.mode + baudrate)) & 0xFF
         data = [checksum, self.mode, baudrate]
         full_packet = self.header + [self.motor_id, data_size] + data
