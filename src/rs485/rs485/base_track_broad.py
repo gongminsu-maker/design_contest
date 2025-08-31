@@ -40,17 +40,23 @@ class BaseBroad(Node):
 
 
         transforms = []
-        transforms.append(self.robot_broad("CoG", -0.1, 0.0, 0.135))
-        transforms.append(self.robot_broad("robot_FL", 0.297, -0.314, 0.0))
-        transforms.append(self.robot_broad("robot_FR", 0.297,  0.314, 0.0))
-        transforms.append(self.robot_broad("robot_RR", -0.297, 0.314, 0.0))
-        transforms.append(self.robot_broad("robot_RL", -0.297,-0.314, 0.0))
+        transforms.append(self.robot_broad("CoG","base", -0.1, 0.0, 0.135))
+        transforms.append(self.robot_broad("robot_FL","base",  0.297, -0.314, 0.0))
+        transforms.append(self.robot_broad("robot_FR","base",  0.297,  0.314, 0.0))
+        transforms.append(self.robot_broad("robot_RR","base", -0.297,  0.314, 0.0))
+        transforms.append(self.robot_broad("robot_RL","base", -0.297, -0.314, 0.0))
+        transforms.append(self.robot_broad("trackR_FL","track_Right", 0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("trackR_FR","track_Right", 0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("trackR_RR","track_Right",-0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("trackR_RL","track_Right",-0.297, -0.059, 0.0))
         self.tf.sendTransform(transforms)
+
     def callback_imu_track_R(self,msg):
-        self.qx_tr  = msg.orientation.x
+        self.qx_tr = msg.orientation.x
         self.qy_tr = msg.orientation.y
         self.qz_tr = msg.orientation.z
         self.qw_tr = msg.orientation.w
+
     def callback_imu_base(self,msg):
         self.qx = msg.orientation.x
         self.qy = msg.orientation.y
@@ -96,10 +102,10 @@ class BaseBroad(Node):
 
         self.tf_track.sendTransform(t)
 
-    def robot_broad(self, child, x, y, z):   # base -> support (static broadcaster)
+    def robot_broad(self, parent,child, x, y, z):   # base -> support (static broadcaster)
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = "base"
+        t.header.frame_id = parent
         t.child_frame_id = child
         t.transform.translation.x = x
         t.transform.translation.y = y
