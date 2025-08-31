@@ -84,6 +84,7 @@ class BaseBroad(Node):
         t.transform.rotation.y = self.qy_tr
         t.transform.rotation.z = self.qz_tr
         t.transform.rotation.w = self.qw_tr
+        self.get_logger().info(f"track_sub_success")
 
         self.tf_track.sendTransform(t)
 
