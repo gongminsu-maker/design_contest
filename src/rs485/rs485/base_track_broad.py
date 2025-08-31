@@ -88,9 +88,9 @@ class BaseBroad(Node):
         t.transform.translation.x = 0.0
         t.transform.translation.y = -0.314
         t.transform.translation.z = 0.135
-        t.transform.rotation.x = 0.0
+        t.transform.rotation.x = self.qx_tr
         t.transform.rotation.y = self.qy_tr
-        t.transform.rotation.z = 0.0
+        t.transform.rotation.z = self.qz_tr
         t.transform.rotation.w = self.qw_tr
         self.get_logger().info(f"track_sub_success")
 
