@@ -65,6 +65,7 @@ class BaseBroad(Node):
         t.transform.rotation.y = self.qy
         t.transform.rotation.z = self.qz
         t.transform.rotation.w = self.qw
+        self.get_logger().info(f"base_sub_success")
         self.broad_track()
         self.draw_marker("robtf", 1, -0.1, 0.0, 0.135, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 1.0, 0.0], 0.1)
         self.draw_rectangle_marker()
