@@ -20,13 +20,13 @@ class BaseBroad(Node):
         self.qx = 0.0
         self.qy = 0.0
         self.qz = 0.0
-        self.qw = 0.0
+        self.qw = 1.0
         self.imu_sub_track_R = self.create_subscription(Imu, "/track/imu/data", self.callback_imu_track_R,10)
         self.qx_tr = 0.0
         self.qy_tr = 0.0
         self.qz_tr = 0.0
-        self.qw_tr = 0.0
-        
+        self.qw_tr = 1.0
+
         # 마커 pub용
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
         # broadcaster용
