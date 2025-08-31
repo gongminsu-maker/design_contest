@@ -27,10 +27,10 @@ class BaseBroad(Node):
         self.qz_tr = 0.0
         self.qw_tr = 1.0
         self.imu_sub_track_L = self.create_subscription(Imu, "/track_left/imu/data", self.callback_imu_track_L,10)
-        self.qx_tr = 0.0
-        self.qy_tr = 0.0
-        self.qz_tr = 0.0
-        self.qw_tr = 1.0
+        self.qx_tl = 0.0
+        self.qy_tl = 0.0
+        self.qz_tl = 0.0
+        self.qw_tl = 1.0
 
         # 마커 pub용
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
