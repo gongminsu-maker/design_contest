@@ -16,7 +16,7 @@ class BaseBroad(Node):
     def __init__(self):
         super().__init__("Basebroad_node")
         # IMU구독용
-        self.imu_sub_base = self.create_subscription(Imu, "/imu/data",self.callback_imu_base,10)
+        self.imu_sub_base = self.create_subscription(Imu, "/base/imu/data",self.callback_imu_base,10)
         self.imu_sub_track_R = self.create_subscription(Imu, "/track/imu/data", self.callback_imu_track_R,10)
         # 마커 pub용
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
