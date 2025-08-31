@@ -41,10 +41,10 @@ class BaseBroad(Node):
 
         transforms = []
         transforms.append(self.robot_broad("CoG","base", -0.1, 0.0, 0.135))
-        transforms.append(self.robot_broad("base","robot_FL",  0.297, -0.314, 0.0))
-        transforms.append(self.robot_broad("base","robot_FR",  0.297,  0.314, 0.0))
-        transforms.append(self.robot_broad("base","robot_RR", -0.297,  0.314, 0.0))
-        transforms.append(self.robot_broad("base","robot_RL", -0.297, -0.314, 0.0))
+        transforms.append(self.robot_broad("base","robot_FL",  0.297, -0.25, 0.0))# 폭 500(휠간거리)+ 118(세그먼트 폭)mm, 길이 593.8mm
+        transforms.append(self.robot_broad("base","robot_FR",  0.297,  0.25, 0.0))
+        transforms.append(self.robot_broad("base","robot_RR", -0.297,  0.25, 0.0))
+        transforms.append(self.robot_broad("base","robot_RL", -0.297, -0.25, 0.0))
         transforms.append(self.robot_broad("track_Right","trackR_FL", 0.297, -0.059, 0.0))
         transforms.append(self.robot_broad("track_Right","trackR_FR", 0.297,  0.059, 0.0))
         transforms.append(self.robot_broad("track_Right","trackR_RR",-0.297,  0.059, 0.0))
@@ -92,7 +92,7 @@ class BaseBroad(Node):
         t.header.frame_id = "base"
         t.child_frame_id = "track_Right"
         t.transform.translation.x = 0.0
-        t.transform.translation.y = -0.314
+        t.transform.translation.y = -0.25
         t.transform.translation.z = 0.135
         t.transform.rotation.x = 0.0
         t.transform.rotation.y = -self.qx_tr
