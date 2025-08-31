@@ -17,7 +17,16 @@ class BaseBroad(Node):
         super().__init__("Basebroad_node")
         # IMU구독용
         self.imu_sub_base = self.create_subscription(Imu, "/base/imu/data",self.callback_imu_base,10)
+        self.qx = 0.0
+        self.qy = 0.0
+        self.qz = 0.0
+        self.qw = 0.0
         self.imu_sub_track_R = self.create_subscription(Imu, "/track/imu/data", self.callback_imu_track_R,10)
+        self.qx_tr = 0.0
+        self.qy_tr = 0.0
+        self.qz_tr = 0.0
+        self.qw_tr = 0.0
+        
         # 마커 pub용
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
         # broadcaster용
@@ -37,7 +46,11 @@ class BaseBroad(Node):
         transforms.append(self.robot_broad("robot_RR", -0.297, 0.314, 0.0))
         transforms.append(self.robot_broad("robot_RL", -0.297,-0.314, 0.0))
         self.tf.sendTransform(transforms)
-
+    def callback_imu_track_R(self,msg):
+        self.qx_tr  = msg.orientation.x
+        self.qy_tr = msg.orientation.y
+        self.qz_tr = msg.orientation.z
+        self.qw_tr = msg.orientation.w
     def callback_imu_base(self,msg):
         self.qx = msg.orientation.x
         self.qy = msg.orientation.y
@@ -45,12 +58,6 @@ class BaseBroad(Node):
         self.qw = msg.orientation.w
         self.broad_base()
 
-    def callback_imu_track_R(self,msg):
-        self.qx_tr  = msg.orientation.x
-        self.qy_tr = msg.orientation.y
-        self.qz_tr = msg.orientation.z
-        self.qw_tr = msg.orientation.w
-        
 
     def broad_base(self):          
 
