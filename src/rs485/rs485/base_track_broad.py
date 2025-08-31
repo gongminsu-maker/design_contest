@@ -16,7 +16,8 @@ class BaseBroad(Node):
     def __init__(self):
         super().__init__("Basebroad_node")
         # IMU구독용
-        self.imu_sub = self.create_subscription(Imu, "/imu/data",self.callback_imu,10)
+        self.imu_sub_base = self.create_subscription(Imu, "/imu/data",self.callback_imu_base,10)
+        self.imu_sub_track_R = self.create_subscription(Imu, "/track/imu/data", self.callback_imu_track_R,10)
         # 마커 pub용
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
         # broadcaster용
@@ -37,14 +38,20 @@ class BaseBroad(Node):
         transforms.append(self.robot_broad("robot_RL", -0.297,-0.314, 0.0))
         self.tf.sendTransform(transforms)
 
-    def callback_imu(self,msg):
-        self.qx  = msg.orientation.x
+    def callback_imu_base(self,msg):
+        self.qx = msg.orientation.x
         self.qy = msg.orientation.y
         self.qz = msg.orientation.z
         self.qw = msg.orientation.w
         self.broad_base()
 
-     
+    def callback_imu_track_R(self,msg):
+        self.qx_tr  = msg.orientation.x
+        self.qy_tr = msg.orientation.y
+        self.qz_tr = msg.orientation.z
+        self.qw_tr = msg.orientation.w
+        
+
     def broad_base(self):          
 
         t = TransformStamped()
@@ -58,12 +65,12 @@ class BaseBroad(Node):
         t.transform.rotation.y = self.qy
         t.transform.rotation.z = self.qz
         t.transform.rotation.w = self.qw
-
         self.broad_track()
         self.draw_marker("robtf", 1, -0.1, 0.0, 0.135, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 1.0, 0.0], 0.1)
         self.draw_rectangle_marker()
         self.draw_zmp_marker()
         self.tf_base.sendTransform(t)
+
     def broad_track(self):          
 
         t = TransformStamped()
@@ -73,10 +80,10 @@ class BaseBroad(Node):
         t.transform.translation.x = 0.0
         t.transform.translation.y = -0.314
         t.transform.translation.z = 0.135
-        t.transform.rotation.x = 0.0
-        t.transform.rotation.y = 0.0
-        t.transform.rotation.z = 0.0
-        t.transform.rotation.w = 1.0
+        t.transform.rotation.x = self.qx_tr
+        t.transform.rotation.y = self.qy_tr
+        t.transform.rotation.z = self.qz_tr
+        t.transform.rotation.w = self.qw_tr
 
         self.tf_track.sendTransform(t)
 
