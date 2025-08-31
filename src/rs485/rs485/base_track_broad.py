@@ -7,9 +7,9 @@ import tf2_ros
 from visualization_msgs.msg import Marker
 from builtin_interfaces.msg import Duration
 from sensor_msgs.msg import Imu
-from tf_transformations import euler_from_quaternion
 from tf_transformations import quaternion_matrix
 from rclpy.duration import Duration as rclpyDuration  # timeout용
+
 # test
 class BaseBroad(Node):
     
@@ -21,7 +21,12 @@ class BaseBroad(Node):
         self.qy = 0.0
         self.qz = 0.0
         self.qw = 1.0
-        self.imu_sub_track_R = self.create_subscription(Imu, "/track/imu/data", self.callback_imu_track_R,10)
+        self.imu_sub_track_R = self.create_subscription(Imu, "/track_right/imu/data", self.callback_imu_track_R,10)
+        self.qx_tr = 0.0
+        self.qy_tr = 0.0
+        self.qz_tr = 0.0
+        self.qw_tr = 1.0
+        self.imu_sub_track_L = self.create_subscription(Imu, "/track_left/imu/data", self.callback_imu_track_L,10)
         self.qx_tr = 0.0
         self.qy_tr = 0.0
         self.qz_tr = 0.0
@@ -38,7 +43,7 @@ class BaseBroad(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
-
+        # static_broadcaster
         transforms = []
         transforms.append(self.robot_broad("CoG","base", -0.1, 0.0, 0.135))
         transforms.append(self.robot_broad("base","robot_FL",  0.297, -0.25, 0.0))# 폭 500(휠간거리)+ 118(세그먼트 폭)mm, 길이 593.8mm
@@ -49,6 +54,10 @@ class BaseBroad(Node):
         transforms.append(self.robot_broad("track_Right","trackR_FR", 0.297,  0.059, 0.0))
         transforms.append(self.robot_broad("track_Right","trackR_RR",-0.297,  0.059, 0.0))
         transforms.append(self.robot_broad("track_Right","trackR_RL",-0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_FL", 0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_FR", 0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_RR",-0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_RL",-0.297, -0.059, 0.0))
         self.tf.sendTransform(transforms)
 
     def callback_imu_track_R(self,msg):
@@ -56,6 +65,12 @@ class BaseBroad(Node):
         self.qy_tr = msg.orientation.y
         self.qz_tr = msg.orientation.z
         self.qw_tr = msg.orientation.w
+
+    def callback_imu_track_L(self,msg):
+        self.qx_tl = msg.orientation.x
+        self.qy_tl = msg.orientation.y
+        self.qz_tl = msg.orientation.z
+        self.qw_tl = msg.orientation.w
 
     def callback_imu_base(self,msg):
         self.qx = msg.orientation.x
@@ -79,13 +94,14 @@ class BaseBroad(Node):
         t.transform.rotation.z = self.qz
         t.transform.rotation.w = self.qw
         self.get_logger().info(f"base_sub_success")
-        self.broad_track()
+        self.broad_track_R()
+        self.broad_track_L()
         self.draw_marker("robtf", 1, -0.1, 0.0, 0.135, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 1.0, 0.0], 0.1)
         self.draw_rectangle_marker()
         self.draw_zmp_marker()
         self.tf_base.sendTransform(t)
 
-    def broad_track(self):          
+    def broad_track_R(self):          
 
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
@@ -98,7 +114,21 @@ class BaseBroad(Node):
         t.transform.rotation.y = -self.qx_tr
         t.transform.rotation.z = 0.0
         t.transform.rotation.w = self.qw_tr
-        self.get_logger().info(f"track_sub_success")
+
+        self.tf_track.sendTransform(t)
+    def broad_track_L(self):          
+
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "base"
+        t.child_frame_id = "track_Left"
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.25
+        t.transform.translation.z = 0.135
+        t.transform.rotation.x = 0.0
+        t.transform.rotation.y = -self.qx_tl
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = self.qw_tl
 
         self.tf_track.sendTransform(t)
 
