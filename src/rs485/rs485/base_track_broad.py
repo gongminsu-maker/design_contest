@@ -37,7 +37,8 @@ class BaseBroad(Node):
         # broadcaster용
         self.tf = tf2_ros.StaticTransformBroadcaster(self)
         self.tf_base = tf2_ros.TransformBroadcaster(self)
-        self.tf_track = tf2_ros.TransformBroadcaster(self)
+        self.tf_track_r = tf2_ros.TransformBroadcaster(self)
+        self.tf_track_l = tf2_ros.TransformBroadcaster(self)
 
         #Marker용 listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -115,7 +116,7 @@ class BaseBroad(Node):
         t.transform.rotation.z = 0.0
         t.transform.rotation.w = self.qw_tr
 
-        self.tf_track.sendTransform(t)
+        self.tf_track_r.sendTransform(t)
     def broad_track_L(self):          
 
         t = TransformStamped()
@@ -130,7 +131,7 @@ class BaseBroad(Node):
         t.transform.rotation.z = 0.0
         t.transform.rotation.w = self.qw_tl
 
-        self.tf_track.sendTransform(t)
+        self.tf_track_l.sendTransform(t)
 
     def robot_broad(self, parent,child, x, y, z):   # base -> support (static broadcaster)
         t = TransformStamped()
