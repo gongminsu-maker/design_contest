@@ -2,10 +2,13 @@
 TSS_test = rs485.TSS_test:main
 base_broad = rs485.base_broad:main
 base_broad_imu = rs485.base_broad_imu:main
-cmd_vel = rs485.cmd_vel:main
+base_track_broad = rs485.base_track_broad:main
 co = rs485.co
+diff_cmd_vel = rs485.diff_cmd_vel:main
 id_baud = rs485.id_baud:main
+imu_pub = rs485.imu_pub:main
 node = rs485.node:main
+one_cmd_vel = rs485.one_cmd_vel:main
 receiver = rs485.receiver:main
 testcode = rs485.testcode:main
 transceiver = rs485.transceiver:main

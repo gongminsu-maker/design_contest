@@ -23,7 +23,8 @@ setup(
             "receiver = rs485.receiver:main",
             "transceiver = rs485.transceiver:main",
             "id_baud = rs485.id_baud:main",
-            "cmd_vel = rs485.cmd_vel:main",
+            "diff_cmd_vel = rs485.diff_cmd_vel:main",
+            "one_cmd_vel = rs485.one_cmd_vel:main",
             "testcode = rs485.testcode:main",
             "base_broad = rs485.base_broad:main",
             "co = rs485.co",
@@ -32,8 +33,7 @@ setup(
             "TSS_test = rs485.TSS_test:main",
             "base_broad_imu = rs485.base_broad_imu:main",
             "base_track_broad = rs485.base_track_broad:main",
-
-            
+            "imu_pub = rs485.imu_pub:main",
         ],
     },
 )
