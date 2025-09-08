@@ -88,7 +88,7 @@ class BaseBroad(Node):
         self.v_des = float(max(self.v_min, min(self.v_max, msg.linear.x)))
         self.w_des = float(max(self.w_min, min(self.w_max, msg.angular.z)))
         self.last_cmd_time = self.get_clock().now()
-    
+
     def callback_imu(self,msg):
         self.qx = msg.orientation.x
         self.qy = msg.orientation.y
@@ -312,34 +312,34 @@ class BaseBroad(Node):
             self.get_logger().warn(f"[전복], Sapu: {Sapu}, Sapl: {Sapl}")
         return alpha_lower, alpha_upper, Sapu, Sapl
     
-    # 회전운동시 구심가속도에 의한 x축 zmp
-    def w_bounds(self):
+    # # 회전운동시 구심가속도에 의한 x축 zmp
+    # def w_bounds(self):
 
-        # 예외처리
-        try: 
-            g_local = self.g_local
-            x_nf = self.x_nf
-        except AttributeError:
-            g_local = np.array([0.0,0.0,9.8])
-            x_nf = self.CoG_local[0]
+    #     # 예외처리
+    #     try: 
+    #         g_local = self.g_local
+    #         x_nf = self.x_nf
+    #     except AttributeError:
+    #         g_local = np.array([0.0,0.0,9.8])
+    #         x_nf = self.CoG_local[0]
 
-        # stability index
-        Swl = (1+ (abs(g_local[2])*(x_nf - self.xl))/(self.circle_ac_max*self.CoG_local[2]))/2
-        Sw = Swl # 구심가속도는 하한에만 영향이 있음
+    #     # stability index
+    #     Swl = (1+ (abs(g_local[2])*(x_nf - self.xl))/(self.circle_ac_max*self.CoG_local[2]))/2
+    #     Sw = Swl # 구심가속도는 하한에만 영향이 있음
 
 
-        if Sw >= 1*self.sf: 
-            circle_ac = self.circle_ac_max
-            self.get_logger().warn(f"[회전 구심 안정], Sw: {Sw},circle_ac: {circle_ac}") 
-        elif Sw >0 and Sw <1*self.sf: 
-            circle_ac = max(0,(2/self.sf)*(0.5*self.sf-min(Sw,1*self.sf))*self.circle_ac_max)
-            self.get_logger().warn(f"[회전 구심 제약], Sw: {Sw},circle_ac: {circle_ac}")
-        else:
-            circle_ac = 0.0
-            self.get_logger().warn(f"[전복], Sw: {Sw}")
-        w_lower = max(self.w_min,-math.sqrt(circle_ac/abs(self.CoG_local[0])))
-        w_upper = min(self.w_max,math.sqrt(circle_ac/abs(self.CoG_local[0])))
-        return w_lower, w_upper, Sw
+    #     if Sw >= 1*self.sf: 
+    #         circle_ac = self.circle_ac_max
+    #         self.get_logger().warn(f"[회전 구심 안정], Sw: {Sw},circle_ac: {circle_ac}") 
+    #     elif Sw >0 and Sw <1*self.sf: 
+    #         circle_ac = max(0,(2/self.sf)*(0.5*self.sf-min(Sw,1*self.sf))*self.circle_ac_max)
+    #         self.get_logger().warn(f"[회전 구심 제약], Sw: {Sw},circle_ac: {circle_ac}")
+    #     else:
+    #         circle_ac = 0.0
+    #         self.get_logger().warn(f"[전복], Sw: {Sw}")
+    #     w_lower = max(self.w_min,-math.sqrt(circle_ac/abs(self.CoG_local[0])))
+    #     w_upper = min(self.w_max,math.sqrt(circle_ac/abs(self.CoG_local[0])))
+    #     return w_lower, w_upper, Sw
     
     def re_cmd_vel(self):
         now = self.get_clock().now()
@@ -351,18 +351,22 @@ class BaseBroad(Node):
         a_cmd = (self.v_des - self.prev_vel) / self.del_t
         a_lower, a_upper, Sau, Sal = self.lin_accel_bounds()
 
-        self.a_drive = max(a_lower, min(a_upper, a_cmd))
-
-        ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
+        if Sau < 0 or Sal < 0:
+            ugv_lin_vel = 0.0  # 전복시 모터 멈춤
+        else:
+            self.a_drive = max(a_lower, min(a_upper, a_cmd))
+            ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
         re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
 
         alpha_cmd = (self.w_des - self.prev_ang) / self.del_t
         alpha_lower, alpha_upper, Sapu, Sapl = self.alpha_bounds()
-        w_lower, w_upper, Sw = self.w_bounds()
-
-        self.alpha_drive = max(alpha_lower, min(alpha_upper, alpha_cmd))
-        ugv_ang_vel = self.prev_ang + self.alpha_drive * self.del_t
-        re_ang_vel = max(w_lower, min(w_upper,ugv_ang_vel)) # alpha와 w의 zmp제한 교집합
+        if Sapu < 0 or Sapl < 0:
+            ugv_ang_vel = 0.0 # 전복시 모터 멈춤
+        else: 
+        #w_lower, w_upper, Sw = self.w_bounds()
+            self.alpha_drive = max(alpha_lower, min(alpha_upper, alpha_cmd))
+            ugv_ang_vel = self.prev_ang + self.alpha_drive * self.del_t
+        re_ang_vel = max(self.w_min, min(self.w_max,ugv_ang_vel)) # alpha와 w의 zmp제한 교집합
         
 
         v= Twist()
