@@ -12,18 +12,21 @@ class MotorControllerNode(Node):
         super().__init__('motorcontroller_node')
 
         self.L = 0.5 #휠간격
-        # 키보드 속도 명령 수신
-        self.sub = self.create_subscription(Twist,"/cmd_vel",self.motor_control,10)
-        # 모터 상태 pub
+        # 제한된 명령 수신
+        self.sub = self.create_subscription(Twist,"/revised/cmd_vel",self.motor_control,10)
+
+        # 모터 상태 pub (defaul: 속도 [0], 방향[전진])
         self.speed_R_RX = 0
         self.speed_L_RX= 0
+        self.direct_R_RX = 0x00
+        self.direct_L_LX = 0x01
         self.pub = self.create_publisher(Twist,"/motor/cmd_vel",10)
         self.timer_state = self.create_timer(0.1, self.motor_state)     # 10HZ
         
 
         # serial setting
         self.ser_R = serial.Serial(
-            port='/dev/ttyUSB0',         # 적절한 포트로 수정 (ls /dev/ttyUSB*을 통해 포트번호 확인하기)
+            port='/dev/ttyUSB0',         # 적절한 포트로 수정 (ls /dev/ttyUSB*을 통해 포트번호 확인하기), **Right 먼저 시리얼 포트에 끼기**
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -86,23 +89,24 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_R = 0x00
+                self.direction_R = 0x00 # 전진
 
-            else:
-                self.direction_R = 0x01
+            else: 
+                self.direction_R = 0x01 # 후진
         else:
             self.direction_R = 0x00
 
         self.speed_int_R = abs(int(rpm*10))              # 계산된 rpm을 실제 프로토콜에 맞는 rpm으로 변환 ex(1300rpm을 명령하면 130rpm으로 돈다)
-        return self.speed_int_R   
+        return self.speed_int_R 
+      
     def cal_speed_L(self, v):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_L = 0x01
+                self.direction_L = 0x01 # 전진
 
             else:
-                self.direction_L = 0x00
+                self.direction_L = 0x00 # 후진
         else:
             self.direction_L = 0x00
 
@@ -129,10 +133,12 @@ class MotorControllerNode(Node):
                         self.get_logger().warn("[RX_R] Payload too short; skipping")
                         continue
                     speed_rpm_01 = ((payload[3] << 8) | payload[4] ) * 0.1
+                    direct = payload[2]
                     # pos랑 전류는 필요하면 사용
                     # pos_deg_01 = ((payload[5] << 8) | payload[6]) * 0.1
                     # current_A_01 = payload[7] * 0.1
                     self.speed_R_RX = speed_rpm_01
+                    self.direct_R_RX = direct # 속력에 부호를 붙이기 위함
             except Exception as e:
                 self.get_logger().warn(f"[RX_R] Exception: {e}")
 
@@ -158,10 +164,12 @@ class MotorControllerNode(Node):
                         self.get_logger().warn("[RX_L] Payload too short; skipping")
                         continue
                     speed_rpm_01 = ((payload[3] << 8) | payload[4] ) * 0.1
+                    direct = payload[2]
                     # pos랑 전류는 필요하면 사용
                     # pos_deg_01 = ((payload[5] << 8) | payload[6]) * 0.1
                     # current_A_01 = payload[7] * 0.1
                     self.speed_L_RX = speed_rpm_01
+                    self.direct_L_LX = direct
             except Exception as e:
                 self.get_logger().warn(f"[RX_L] Exception: {e}")
 
@@ -170,8 +178,8 @@ class MotorControllerNode(Node):
     def motor_control(self,msg):
         lin_v = float(msg.linear.x)
         ang_v = float(msg.angular.z)
-        vel_r = lin_v + ang_v*self.L/2    # 속도 분배
-        vel_l = lin_v - ang_v*self.L/2
+        vel_r = lin_v - ang_v*self.L/2    # 속도 분배
+        vel_l = lin_v + ang_v*self.L/2
         self.cal_speed_R(vel_r)
         self.cal_speed_L(vel_l)
         
@@ -206,8 +214,10 @@ class MotorControllerNode(Node):
         self.get_logger().info(f"Sent packet to Left: {[hex(b) for b in full_packet_L]}")
 
     def request_feedback(self):
+
         data_size = 0x02
         mode = 0xA2
+
         #Right motor
         checksum_R = (~(self.motor_id + data_size + mode)) & 0xFF
         data_R = [checksum_R , mode]
@@ -226,16 +236,25 @@ class MotorControllerNode(Node):
 
     def motor_state(self):
         motor = Twist()
-        m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 
+        m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 (속도 크기만 수신됨, 부호 X => 부호 변환해주어야함)
         m_vel_L = self.speed_L_RX*(2*m.pi/60)*self.radius
+
+        if self.direct_R_RX == 0x00:
+            motor_vel_R = m_vel_R
+        else:
+            motor_vel_R = -m_vel_R
+
+        if self.direct_L_LX ==0x01:
+            motor_vel_L = m_vel_L
+        else:
+            motor_vel_L = -m_vel_L
+            
         self.get_logger().info(f"R_RX{self.speed_R_RX}, L_LX{self.speed_L_RX}")
-        m_vel = (m_vel_R + m_vel_L)/2    # 선속도
-        m_ang = (m_vel_R - m_vel_L)/(self.width)
+        m_vel = (motor_vel_R + motor_vel_L)/2    # 선속도
+        m_ang = (-motor_vel_R + motor_vel_L)/(self.width)
         motor.linear.x = m_vel
         motor.angular.z = m_ang
         self.pub.publish(motor)
-
-
 
 
 

@@ -23,6 +23,8 @@ rs485/node.py
 rs485/one_cmd_vel.py
 rs485/python.py
 rs485/receiver.py
+rs485/roll_pitch_test.py
+rs485/rqt.py
 rs485/serial_test.py
 rs485/testcode.py
 rs485/transceiver.py

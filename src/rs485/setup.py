@@ -34,6 +34,8 @@ setup(
             "base_broad_imu = rs485.base_broad_imu:main",
             "base_track_broad = rs485.base_track_broad:main",
             "imu_pub = rs485.imu_pub:main",
+            "rqt = rs485.rqt:main",
+            "roll_pitch_test = rs485.roll_pitch_test:main",
         ],
     },
 )

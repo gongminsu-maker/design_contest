@@ -11,6 +11,7 @@ from tf_transformations import euler_from_quaternion
 from rclpy.duration import Duration as rclpyDuration   # timeout용
 # imu 센서 sub
 from sensor_msgs.msg import Imu
+from geometry_msgs.msg import Twist
 
 class BaseBroad(Node):
     # 실제 IMU센서를 읽어서 지지면이 움직이는 것을 확인하는 코드(준비물: IMU)
@@ -19,7 +20,16 @@ class BaseBroad(Node):
         super().__init__("Basebroad_node")
 
         # IMU SUB
-        self.imu = self.create_subscription(Imu,"/imu/data",self.callback_imu,10)
+        self.imu = self.create_subscription(Imu,'/base/imu/data',self.callback_imu,10)
+        # cmd_vel SUB
+        self.sub_cmd_vel = self.create_subscription(Twist,"/cmd_vel",self.callback_vel,10)
+        # motor state SUB
+        self.sub_motor_state = self.create_subscription(Twist,"/motor/cmd_vel", self.callback_motor_state,10)
+        
+        time_period = 0.5 # 2HZ [모터의 디폴트 도달시간이 0.5초임으로 timer와 맞춤]
+        self.create_timer(time_period, self.re_cmd_vel)
+        # revised cmd_vel PUB
+        self.pub = self.create_publisher(Twist,"/revised/cmd_vel",10)
 
         # 브로드캐스터
         self.tf = tf2_ros.StaticTransformBroadcaster(self)  # static broadcaster
@@ -29,15 +39,29 @@ class BaseBroad(Node):
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
+        
+        # 속성값
+        self.M = 25.0
+        self.xu = 0.295
+        self.xl = -0.295
+        self.v_max = 0.26
+        self.v_min = -0.26
+        self.a_max = 0.52
+        self.a_min = -0.52
+        self.del_t = 0.5
+        x = -0.1
+        h = 0.135
+        self.CoG_local = np.array([x, 0.0, h])
+        self.sf = 5.0 # default = 1.0 
 
-        self.theta_tilted = 0.0                     # world 기준 tilted 각도 
-        self.tilted_direct = -1
-        self.theta_base = 0.0                       # tilted 기준 base각도
-        self.base_direct = -1
-        self.theta_max = math.radians(56)    #  pi/4
-        self.theta_min = -math.radians(56)   # -pi/4
+        # 초기값
+        self.prev_vel = 0.0
+        self.prev_ang = 0.0
+        self.a_drive = 0.0
+        self.v_des = 0.0
+        self.cmd_timeout = 1.0
+        self.last_cmd_time = self.get_clock().now()
 
-        self.timer = self.create_timer(0.15, self.broad_tilted_ground)
 
         transforms = []
         transforms.append(self.robot_broad("CoG", -0.1, 0.0, 0.135))
@@ -46,9 +70,16 @@ class BaseBroad(Node):
         transforms.append(self.robot_broad("robot_RR", -0.297, 0.314, 0.0))
         transforms.append(self.robot_broad("robot_RL", -0.297,-0.314, 0.0))
         self.tf.sendTransform(transforms)   # static broad
-
+    
+    def callback_motor_state(self,msg):
+        self.prev_vel = msg.linear.x
+        self.prev_ang = msg.angular.z
+    def callback_vel(self,msg):
+        self.v_des = float(max(self.v_min, min(self.v_max, msg.linear.x)))
+        self.last_cmd_time = self.get_clock().now()
+    
     def callback_imu(self,msg):
-        self.qx  = msg.orientation.x
+        self.qx = msg.orientation.x
         self.qy = msg.orientation.y
         self.qz = msg.orientation.z
         self.qw = msg.orientation.w
@@ -56,16 +87,6 @@ class BaseBroad(Node):
 
      
     def broad_base(self):                # tilted ground -> base (broadcaster)
-        # 조향 방향 갱신
-        dtheta = 0.04
-        self.theta_base += self.base_direct* dtheta
-
-        # 범위 초과 시 방향 반전
-        if self.theta_base <= self.theta_min or self.theta_base >= self.theta_max:
-            self.base_direct *= -1
-
-        # ground 회전 (Roll & Pitch)
-        q = quaternion_from_euler(0, 0, self.theta_base)
 
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
@@ -74,7 +95,7 @@ class BaseBroad(Node):
         t.transform.translation.x = 0.0
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
-        t.transform.rotation.x = self.qx
+        t.transform.rotation.x = -self.qx
         t.transform.rotation.y = self.qy
         t.transform.rotation.z = self.qz
         t.transform.rotation.w = self.qw
@@ -154,15 +175,13 @@ class BaseBroad(Node):
         # base frame기준으로 zmp 계산
         g = 9.8
         h = 0.135
-        x = -0.1
         M = 25.0
-        v = 0.0    # 최대속도 0.2m/s
+        v = 0.0    # 최대속도 0.26m/s
         w = 0.0    # 최대각속도 0.8rad/s
         t = 0.5    # 도달시간 디폴드값
 
         omega = np.array([0.0, 0.0, w])
         alpha = np.array([0.0, 0.0, w / t])
-        CoG_local = np.array([x, 0.0, h])
         CoG_a_local = np.array([v / t, 0.0, 0.0])
         # 지면 기울기 반영 world에서 base의 좌표계 회전을 listen해서 th, psi갱신
         try:
@@ -185,22 +204,74 @@ class BaseBroad(Node):
         R_world_to_local = R_yaw @ R_pitch @ R_roll  # ros회전변환순서 ZYX
 
         g_world = np.array([0.0, 0.0, g])
-        g_local = R_world_to_local @ g_world 
+        self.g_local = R_world_to_local @ g_world 
          
         # non_force zmp
-        x_nf = (M * g_local[2] * CoG_local[0] - M * g_local[0] * CoG_local[2]) / (M * g_local[2])
-        y_nf = (M * g_local[2] * CoG_local[1] - M * g_local[1] * CoG_local[2]) / (M * g_local[2])
-        self.get_logger().info(f"g좌표: {g_local}")
+        self.x_nf = (M * self.g_local[2] * self.CoG_local[0] - M * self.g_local[0] * self.CoG_local[2]) / (M * self.g_local[2])
+        self.y_nf = (M * self.g_local[2] * self.CoG_local[1] - M * self.g_local[1] * self.CoG_local[2]) / (M * self.g_local[2])
+        #self.get_logger().info(f"g좌표: {self.g_local}")
         # 구심가속도, 회전접선가속도
-        a_c_local = np.cross(omega, np.cross(omega, CoG_local))
-        circle_ac_local = np.cross(alpha,CoG_local)
-        # 다음 수식은 결과 값임으로 abs(g_local)을 사용해야함.
-        x_zmp_local = x_nf - h * (CoG_a_local[0] + a_c_local[0]) / abs(g_local[2])
-        y_zmp_local = y_nf - h * (CoG_a_local[1] + a_c_local[1] + circle_ac_local[1]) / abs(g_local[2])
+        a_c_local = np.cross(omega, np.cross(omega, self.CoG_local))
+        circle_ac_local = np.cross(alpha,self.CoG_local)
+        # 다음 수식은 결과 값임으로 abs(self.g_local)을 사용해야함.
+        x_zmp_local = self.x_nf - h * (CoG_a_local[0] + a_c_local[0]) / abs(self.g_local[2])
+        y_zmp_local = self.y_nf - h * (CoG_a_local[1] + a_c_local[1] + circle_ac_local[1]) / abs(self.g_local[2])
         zmp_local = np.array([x_zmp_local, y_zmp_local, 0.0])
 
         self.draw_marker("base","zmp", 200, zmp_local[0], zmp_local[1], 0.0, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 0.0, 1.0], 0.07)
 
+    def accel_bounds(self):
+        try: 
+            g_local = self.g_local
+            x_nf = self.x_nf
+        except AttributeError:
+            g_local = np.array([0.0,0.0,9.8])
+            x_nf = self.CoG_local[0]
+
+        # stability index
+        Sau = (1- (g_local[2]*(x_nf - self.xu))/(self.a_max*self.CoG_local[2]))/2
+        Sal = (1+( g_local[2]*(x_nf - self.xl))/(self.a_max*self.CoG_local[2]))/2
+        # Sau,Sal이 1일 때가 zmp의 경계가 polygon에 접하는 순간
+        # 안전계수(self.sf)를 곱해 커스텀 가능 
+        if Sau >= 1*self.sf and Sal >= 1*self.sf:
+            a_lower = self.a_min
+            a_upper = self.a_max
+            self.get_logger().warn(f"[안정], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
+        elif Sau >0 and Sau <1*self.sf and Sal >= self.sf:
+            a_lower = (2/self.sf)*(0.5*self.sf-min(Sau,1*self.sf))*self.a_max
+            a_upper = self.a_max
+            self.get_logger().warn(f"[감속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
+        elif Sau >= 1*self.sf and Sal > 0 and Sal < 1*self.sf :
+            a_lower = self.a_min
+            a_upper = (2/self.sf)*(min(Sal,1*self.sf)-0.5*self.sf)*self.a_max
+            self.get_logger().warn(f"[가속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
+        elif Sau >0 and Sau < 1*self.sf and Sal > 0 and Sal <1*self.sf:
+            a_lower = (2/self.sf)*(0.5*self.sf-min(Sau,1*self.sf))*self.a_max
+            a_upper = (2/self.sf)*(min(Sal,1*self.sf)-0.5*self.sf)*self.a_max
+            self.get_logger().warn(f"[가감속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
+        else:
+            a_lower = 0.0
+            a_upper = 0.0
+            self.get_logger().warn(f"[전복], Sau: {Sau}, Sal: {Sal}")
+        return a_lower, a_upper, Sau, Sal
+    
+    def re_cmd_vel(self):
+        now = self.get_clock().now()
+        
+        if (now - self.last_cmd_time).nanoseconds*1e-9 > self.cmd_timeout:
+            self.v_des = 0.0
+        a_cmd = (self.v_des - self.prev_vel) / self.del_t
+        a_lower, a_upper, Sau, Sal = self.accel_bounds()
+
+        self.a_drive = max(a_lower, min(a_upper, a_cmd))
+
+        ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
+        re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
+
+        v= Twist()
+        v.linear.x = re_cmd_vel
+        v.angular.z = 0.0
+        self.pub.publish(v)
 
 def main(args=None):
     rp.init(args=args)

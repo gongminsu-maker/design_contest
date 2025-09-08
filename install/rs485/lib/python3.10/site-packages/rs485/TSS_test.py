@@ -3,7 +3,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist
 import math
 import numpy as np
-
+from sensor_msgs.msg import Imu
+ 
 
 class Tss(Node):
     def __init__(self):
@@ -16,8 +17,11 @@ class Tss(Node):
         time_period = 0.5 # 2HZ
         self.create_timer(time_period, self.re_cmd_vel)
 
+        # IMU SUB
+        self.imu = self.create_subscription(Imu,'/base/imu/data',self.callback_imu,10)
+
         # 세팅값
-        self.M = 25
+        self.M = 25.0
         self.xu = 0.295
         self.xl = -0.295
         self.v_max = 0.26
@@ -25,19 +29,28 @@ class Tss(Node):
         self.a_max = 0.52
         self.a_min = -0.52
         self.del_t = 0.5
-        self.cog = [-0.05, 0 ,0.135]
+        self.cog = [-0.3, 0.0 ,0.135]
         self.g = 9.8
+
+        # 초기값
+        self.prev_vel = 0.0
+        self.prev_ang = 0.0
+        self.a_drive = 0.0
+        self.v_des = 0.0
+        self.cmd_timeout = 1.0
+        self.last_cmd_time = self.get_clock().now()
 
     def callback_motor_state(self,msg):
         self.prev_vel = msg.linear.x
         self.prev_ang = msg.angular.z
-
-
     def callback_vel(self,msg):
-        v_cmd = msg.linear.x  # 우선 직진, 후진 테스트만
-        a_cmd = (v_cmd-self.prev_vel)/self.del_t
+        self.v_des = float(max(self.v_min, min(self.v_max, msg.linear.x)))
+        self.last_cmd_time = self.get_clock().now()
 
-        th = math.radians(-45) # uphill
+
+    def accel_bounds(self):
+
+        th = math.radians(-60) # uphill
         yaw = math.radians(0)
         psi = math.radians(0)
 
@@ -49,7 +62,7 @@ class Tss(Node):
         g_world = np.array([0.0, 0.0, self.g])
         g_local = R_world_to_local @ g_world 
         # non_force zmp
-        x_nf = (self.M * g_local[2] * self.cog[0] - self.M * g_local[0] * [2]) / (self.M * g_local[2])
+        x_nf = (self.M * g_local[2] * self.cog[0] - self.M * g_local[0] * self.cog[2]) / (self.M * g_local[2])
         # stability index
         Sau = (1- (g_local[2]*(x_nf - self.xu))/(self.a_max*self.cog[2]))/2
         Sal = (1+( g_local[2]*(x_nf - self.xl))/(self.a_max*self.cog[2]))/2
@@ -57,28 +70,44 @@ class Tss(Node):
         if Sau >= 1 and Sal >= 1:
             a_lower = self.a_min
             a_upper = self.a_max
+            self.get_logger().warn(f"[안정], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         elif Sau >0 and Sau <1 and Sal >=1 :
             a_lower = 2*(0.5-min(Sau,1))*self.a_max
             a_upper = self.a_max
+            self.get_logger().warn(f"[감속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         elif Sau >=1 and Sal > 0 and Sal <1 :
             a_lower = self.a_min
             a_upper = 2*(min(Sal,1)-0.5)*self.a_max
+            self.get_logger().warn(f"[가속제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         elif Sau >0 and Sau <1 and Sal > 0 and Sal <1:
             a_lower = 2*(0.5-min(Sau,1))*self.a_max
             a_upper = 2*(min(Sal,1)-0.5)*self.a_max
+            self.get_logger().warn(f"[가감속제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         else:
-            a_lower = -0.01
-            a_upper = 0.01
-            self.get_logger().warn(f"전복, Sau: {Sau}, Sal: {Sal}")
-        self.a_drive = max(a_lower, min(a_upper,a_cmd))
-
+            a_lower = 0.0
+            a_upper = 0.0
+            self.get_logger().warn(f"[전복], Sau: {Sau}, Sal: {Sal}")
+        return a_lower, a_upper, Sau, Sal
+    
 
     def re_cmd_vel(self):
-        v = Twist()
-        ugv_lin_vel = self.prev_vel + self.a_drive*self.del_t
-        re_cmd_vel = max(self.v_min , min(self.v_max, ugv_lin_vel))
+        now = self.get_clock().now()
+        
+        if (now - self.last_cmd_time).nanoseconds*1e-9 > self.cmd_timeout:
+            self.v_des = 0.0
+        a_cmd = (self.v_des - self.prev_vel) / self.del_t
+        a_lower, a_upper, Sau, Sal = self.accel_bounds()
+
+        self.a_drive = max(a_lower, min(a_upper, a_cmd))
+
+        ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
+        re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
+
+        v= Twist()
         v.linear.x = re_cmd_vel
+        v.angular.z = 0.0
         self.pub.publish(v)
+
 
 
 def main(args=None):

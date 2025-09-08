@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
+from std_msgs.msg import Float32
 
 import serial
 import time
@@ -36,6 +37,10 @@ class ImuSerialPublisher(Node):
         super().__init__('imu_serial_publisher')
         # Publisher 3개 생성
         self.pub_base  = self.create_publisher(Imu, '/base/imu/data', 10)
+        self.pub_base_roll = self.create_publisher(Float32, 'base/roll/imu/data',10)
+        self.pub_base_pitch = self.create_publisher(Float32, 'base/pitch/imu/data',10)
+        self.pub_base_yaw = self.create_publisher(Float32, 'base/yaw/imu/data',10)
+
         self.pub_track_r = self.create_publisher(Imu, '/track_right/imu/data', 10)
         self.pub_track_l = self.create_publisher(Imu, '/track_left/imu/data', 10)
 
@@ -76,6 +81,12 @@ class ImuSerialPublisher(Node):
         z_180 = wrap_yaw_deg_180(z)
         x_rad, y_rad, z_rad = degrad(x), degrad(y), degrad(z_180)
         qx_b, qy_b, qz_b, qw_b = quaternion_from_euler(x_rad, y_rad, z_rad)
+        msg_base_roll = Float32()
+        msg_base_roll.data = x
+        msg_base_pitch = Float32()
+        msg_base_pitch.data = y
+        msg_base_yaw = Float32()
+        msg_base_yaw.data = z_180
 
         msg_base = Imu()
         msg_base.header.stamp = now
@@ -85,6 +96,9 @@ class ImuSerialPublisher(Node):
         msg_base.orientation.z = qz_b
         msg_base.orientation.w = qw_b
         self.pub_base.publish(msg_base)
+        self.pub_base_roll.publish(msg_base_roll)
+        self.pub_base_pitch.publish(msg_base_pitch)
+        self.pub_base_yaw.publish(msg_base_yaw)
 
         # ---- 2) Track Right (MPU6050 0x69) ----
         roll_r_rad, pitch_r_rad, yaw_r_rad = degrad(roll_r), degrad(pitch_r), degrad(yaw_r)

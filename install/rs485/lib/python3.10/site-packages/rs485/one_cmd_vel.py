@@ -13,7 +13,7 @@ class MotorControllerNode(Node):
 
         self.L = 0.5 #휠간격
         # 키보드 속도 명령 수신
-        self.sub = self.create_subscription(Twist,"/cmd_vel",self.motor_control,10)
+        self.sub = self.create_subscription(Twist,"/revised/cmd_vel",self.motor_control,10)
         # 모터 상태 pub
         self.speed_R_RX = 0
         self.pub = self.create_publisher(Twist,"/motor/cmd_vel",10)
@@ -72,10 +72,10 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_R = 0x00
+                self.direction_R = 0x01
 
             else:
-                self.direction_R = 0x01
+                self.direction_R = 0x00
         else:
             self.direction_R = 0x00
 

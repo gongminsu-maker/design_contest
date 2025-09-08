@@ -1,0 +1,211 @@
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import Imu
+from std_msgs.msg import Float32
+
+import serial
+import time
+import re
+import math
+from tf_transformations import quaternion_from_euler
+# 파일명 변경시
+# ros2 run rs485 roll_pitch_test --ros-args -p excel_filename:= *.xlsx
+
+
+# === 추가 import ===
+import os
+from datetime import datetime
+from openpyxl import Workbook, load_workbook
+
+SERIAL_PORT = '/dev/ttyACM0'
+BAUD_RATE = 115200
+TIMEOUT = 1.0
+
+# 정규식: X,Y,Z + R_r,P_r,Y_r + R_l,P_l,Y_l
+LINE_RE = re.compile(
+    r'X:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'Y:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'Z:\s*([-+]?\d+(?:\.\d+)?)'
+    r'.*?R_r:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'P_r:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'Y_r:\s*([-+]?\d+(?:\.\d+)?)'
+    r'.*?R_l:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'P_l:\s*([-+]?\d+(?:\.\d+)?)\s+'
+    r'Y_l:\s*([-+]?\d+(?:\.\d+)?)'
+)
+
+def degrad(x: float) -> float:
+    return x * math.pi / 180.0
+
+def wrap_yaw_deg_180(yaw_deg_0_360: float) -> float:
+    return ((yaw_deg_0_360 + 180.0) % 360.0) - 180.0
+
+class ImuSerialPublisher(Node):
+    def __init__(self):
+        super().__init__('imu_serial_publisher')
+        # === 파일명 파라미터 등록 (사용자가 자유롭게 바꿀 수 있음) ===
+        self.declare_parameter('excel_filename', 'imu_log.xlsx')
+        self.excel_filename = self.get_parameter('excel_filename').get_parameter_value().string_value
+
+        # Publisher 3개 생성
+        self.pub_base  = self.create_publisher(Imu, '/base/imu/data', 10)
+        self.pub_base_roll = self.create_publisher(Float32, 'base/roll/imu/data',10)
+        self.pub_base_pitch = self.create_publisher(Float32, 'base/pitch/imu/data',10)
+        self.pub_base_yaw = self.create_publisher(Float32, 'base/yaw/imu/data',10)
+
+        self.pub_track_r = self.create_publisher(Imu, '/track_right/imu/data', 10)
+        self.pub_track_l = self.create_publisher(Imu, '/track_left/imu/data', 10)
+
+        try:
+            self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=TIMEOUT)
+            time.sleep(2.0)  # 아두이노 리셋 대기
+            self.get_logger().info(f"opened {SERIAL_PORT} @ {BAUD_RATE} bps")
+        except serial.SerialException as e:
+            self.get_logger().error(f"Serial open failed : {e}")
+            raise
+
+        # === 엑셀 초기화 ===
+        self._init_excel_logger()
+
+        self.timer = self.create_timer(0.0, self.read_once)  # 가능한 즉시 루프
+
+    # =========================
+    # 엑셀 로거 관련 함수
+    # =========================
+    def _init_excel_logger(self):
+        """엑셀 저장 폴더/파일 초기화 (헤더 자동 추가)."""
+        base_dir = os.path.expanduser('~/pitch_roll_test_excelfile')
+        os.makedirs(base_dir, exist_ok=True)
+        self.excel_path = os.path.join(base_dir, self.excel_filename)
+
+        if os.path.exists(self.excel_path):
+            # 기존 파일 열기
+            try:
+                self.wb = load_workbook(self.excel_path)
+                self.ws = self.wb.active
+                # 헤더가 없으면 추가
+                if self.ws.max_row == 0 or self.ws.cell(row=1, column=1).value is None:
+                    self.ws.append(['time', 'roll', 'pitch', 'yaw'])
+                    self.wb.save(self.excel_path)
+            except Exception as e:
+                # 파일이 깨졌거나 문제 있으면 새로 만듦
+                self.get_logger().warn(f"Failed to open existing Excel. Creating new. err={e}")
+                self.wb = Workbook()
+                self.ws = self.wb.active
+                self.ws.title = 'imu'
+                self.ws.append(['time', 'roll', 'pitch', 'yaw'])
+                self.wb.save(self.excel_path)
+        else:
+            # 새 파일 생성
+            self.wb = Workbook()
+            self.ws = self.wb.active
+            self.ws.title = 'imu'
+            self.ws.append(['time', 'roll', 'pitch', 'yaw'])
+            self.wb.save(self.excel_path)
+
+    def _append_excel_row(self, roll: float, pitch: float, yaw: float):
+        """한 줄 추가 후 저장. time은 로컬 시간 ISO 문자열."""
+        tstr = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # 밀리초까지
+        self.ws.append([tstr, float(roll), float(pitch), float(yaw)])
+        # 안전하게 매 행 저장(원하면 성능 위해 N행마다 저장하도록 바꿀 수 있음)
+        self.wb.save(self.excel_path)
+
+    # =========================
+
+    def read_once(self):
+        raw = self.ser.readline()
+        if not raw:
+            return
+        line = raw.decode('utf-8', errors='replace').strip()
+
+        m = LINE_RE.match(line)
+        if not m:
+            return
+
+        # 값 파싱
+        x = float(m.group(1))
+        y = float(m.group(2))
+        z = float(m.group(3))
+        roll_r = float(m.group(4))
+        pitch_r = float(m.group(5))
+        yaw_r = float(m.group(6))
+        roll_l = float(m.group(7))
+        pitch_l = float(m.group(8))
+        yaw_l = float(m.group(9))
+
+        now = self.get_clock().now().to_msg()
+
+        # ---- 1) BNO055 (base) ----
+        z_180 = wrap_yaw_deg_180(z)
+        x_rad, y_rad, z_rad = degrad(x), degrad(y), degrad(z_180)
+        qx_b, qy_b, qz_b, qw_b = quaternion_from_euler(x_rad, y_rad, z_rad)
+
+        msg_base_roll = Float32()
+        msg_base_roll.data = x
+        msg_base_pitch = Float32()
+        msg_base_pitch.data = y
+        msg_base_yaw = Float32()
+        msg_base_yaw.data = z_180
+
+        msg_base = Imu()
+        msg_base.header.stamp = now
+        msg_base.header.frame_id = 'base'
+        msg_base.orientation.x = qx_b
+        msg_base.orientation.y = qy_b
+        msg_base.orientation.z = qz_b
+        msg_base.orientation.w = qw_b
+        self.pub_base.publish(msg_base)
+        self.pub_base_roll.publish(msg_base_roll)
+        self.pub_base_pitch.publish(msg_base_pitch)
+        self.pub_base_yaw.publish(msg_base_yaw)
+
+        # === 엑셀에 한 줄 기록 ===
+        self._append_excel_row(x, y, z_180)
+
+        # ---- 2) Track Right (MPU6050 0x69) ----
+        roll_r_rad, pitch_r_rad, yaw_r_rad = degrad(roll_r), degrad(pitch_r), degrad(yaw_r)
+        qx_r, qy_r, qz_r, qw_r = quaternion_from_euler(roll_r_rad, pitch_r_rad, yaw_r_rad)
+
+        msg_r = Imu()
+        msg_r.header.stamp = now
+        msg_r.header.frame_id = 'track_right'
+        msg_r.orientation.x = qx_r
+        msg_r.orientation.y = qy_r
+        msg_r.orientation.z = qz_r
+        msg_r.orientation.w = qw_r
+        self.pub_track_r.publish(msg_r)
+
+        # ---- 3) Track Left (MPU6050 0x68) ----
+        roll_l_rad, pitch_l_rad, yaw_l_rad = degrad(roll_l), degrad(pitch_l), degrad(yaw_l)
+        qx_l, qy_l, qz_l, qw_l = quaternion_from_euler(roll_l_rad, pitch_l_rad, yaw_l_rad)
+
+        msg_l = Imu()
+        msg_l.header.stamp = now
+        msg_l.header.frame_id = 'track_left'
+        msg_l.orientation.x = qx_l
+        msg_l.orientation.y = qy_l
+        msg_l.orientation.z = qz_l
+        msg_l.orientation.w = qw_l
+        self.pub_track_l.publish(msg_l)
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = ImuSerialPublisher()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # 엑셀 워크북 안전 저장
+        try:
+            if hasattr(node, 'wb'):
+                node.wb.save(node.excel_path)
+        except Exception:
+            pass
+        if hasattr(node, 'ser') and node.ser and node.ser.is_open:
+            node.ser.close()
+        node.destroy_node()
+        rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()

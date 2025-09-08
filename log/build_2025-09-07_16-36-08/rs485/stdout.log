@@ -1,0 +1,40 @@
+running egg_info
+writing ../../build/rs485/rs485.egg-info/PKG-INFO
+writing dependency_links to ../../build/rs485/rs485.egg-info/dependency_links.txt
+writing entry points to ../../build/rs485/rs485.egg-info/entry_points.txt
+writing requirements to ../../build/rs485/rs485.egg-info/requires.txt
+writing top-level names to ../../build/rs485/rs485.egg-info/top_level.txt
+reading manifest file '../../build/rs485/rs485.egg-info/SOURCES.txt'
+writing manifest file '../../build/rs485/rs485.egg-info/SOURCES.txt'
+running build
+running build_py
+copying rs485/diff_cmd_vel.py -> /home/gongminsu/motor_test/build/rs485/build/lib/rs485
+copying rs485/TSS_test.py -> /home/gongminsu/motor_test/build/rs485/build/lib/rs485
+running install
+running install_lib
+copying /home/gongminsu/motor_test/build/rs485/build/lib/rs485/diff_cmd_vel.py -> /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485
+copying /home/gongminsu/motor_test/build/rs485/build/lib/rs485/TSS_test.py -> /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485
+byte-compiling /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/diff_cmd_vel.py to diff_cmd_vel.cpython-310.pyc
+byte-compiling /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/TSS_test.py to TSS_test.cpython-310.pyc
+running install_data
+running install_egg_info
+removing '/home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info' (and everything under it)
+Copying ../../build/rs485/rs485.egg-info to /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info
+running install_scripts
+Installing TSS_test script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing base_broad script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing base_broad_imu script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing base_track_broad script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing co script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing diff_cmd_vel script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing id_baud script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing imu_pub script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing node script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing one_cmd_vel script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing receiver script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing roll_pitch_test script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing rqt script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing testcode script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing transceiver script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+Installing zmp_test_imu script to /home/gongminsu/motor_test/install/rs485/lib/rs485
+writing list of installed files to '/home/gongminsu/motor_test/build/rs485/install.log'
