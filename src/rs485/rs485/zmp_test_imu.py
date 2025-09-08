@@ -295,16 +295,16 @@ class BaseBroad(Node):
             alpha_upper = self.alpha_max
             self.get_logger().warn(f"[회전 접선 안정], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >0 and Sapu <1*self.sf and Sapl >= 1*self.sf:
-            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapu,1*self.sf))*self.alpha_max
-            alpha_upper = self.alpha_max
+            alpha_lower = self.alpha_min
+            alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
             self.get_logger().warn(f"[회전 접선감속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >= 1*self.sf and Sapl > 0 and Sapl < 1*self.sf :
-            alpha_lower = self.alpha_min
-            alpha_upper = (2/self.sf)*(min(Sapl,1*self.sf)-0.5*self.sf)*self.alpha_max
+            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
+            alpha_upper = self.alpha_max
             self.get_logger().warn(f"[회전 접선 가속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >0 and Sapu < 1*self.sf and Sapl > 0 and Sapl <1*self.sf:
-            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapu,1*self.sf))*self.alpha_max
-            alpha_upper = (2/self.sf)*(min(Sapl,1*self.sf)-0.5*self.sf)*self.alpha_max
+            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
+            alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
             self.get_logger().warn(f"[회전 접선 가감속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         else:
             alpha_lower = 0.0
