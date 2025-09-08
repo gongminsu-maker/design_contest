@@ -44,7 +44,7 @@ class BaseBroad(Node):
         y = 0.0
         h = 0.135
         self.CoG_local = np.array([x, y, h])
-        self.sf = 5.0 # default = 1.0 
+        self.sf = 2.0 # default = 1.0 
         self.M = 25.0
         self.xu = 0.295
         self.xl = -0.295
