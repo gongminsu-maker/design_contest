@@ -173,7 +173,7 @@ class BaseBroad(Node):
         self.marker.publish(m)
 
     def draw_rectangle_marker(self):
-        names = ["robot_FL", "robot_FR", "robot_RR", "robot_RL", "robot_FL"]
+        names = ["trackR_FL", "trackR_RL", "trackL_RR", "trackL_FR", "trackR_FL"]
         points = []
         for name in names:
             try:

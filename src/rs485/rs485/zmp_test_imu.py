@@ -18,8 +18,22 @@ class BaseBroad(Node):
     def __init__(self):
         super().__init__("Basebroad_node")
 
-        # IMU SUB
-        self.imu = self.create_subscription(Imu,'/base/imu/data',self.callback_imu,10)
+        # IMU구독용
+        self.imu_sub_base = self.create_subscription(Imu, "/base/imu/data",self.callback_imu_base,10)
+        self.qx = 0.0
+        self.qy = 0.0
+        self.qz = 0.0
+        self.qw = 1.0
+        self.imu_sub_track_R = self.create_subscription(Imu, "/track_right/imu/data", self.callback_imu_track_R,10)
+        self.qx_tr = 0.0
+        self.qy_tr = 0.0
+        self.qz_tr = 0.0
+        self.qw_tr = 1.0
+        self.imu_sub_track_L = self.create_subscription(Imu, "/track_left/imu/data", self.callback_imu_track_L,10)
+        self.qx_tl = 0.0
+        self.qy_tl = 0.0
+        self.qz_tl = 0.0
+        self.qw_tl = 1.0
         # cmd_vel SUB
         self.sub_cmd_vel = self.create_subscription(Twist,"/cmd_vel",self.callback_vel,10)
         # motor state SUB
@@ -30,28 +44,34 @@ class BaseBroad(Node):
         # revised cmd_vel PUB
         self.pub = self.create_publisher(Twist,"/revised/cmd_vel",10)
 
-        # 브로드캐스터
-        self.tf = tf2_ros.StaticTransformBroadcaster(self)  # static broadcaster
-        self.tf_base = tf2_ros.TransformBroadcaster(self)   # broadcaster
-
+        # broadcaster용
+        self.tf = tf2_ros.StaticTransformBroadcaster(self)
+        self.tf_base = tf2_ros.TransformBroadcaster(self)
+        self.tf_track_r = tf2_ros.TransformBroadcaster(self)
+        self.tf_track_l = tf2_ros.TransformBroadcaster(self)
+        
         #Marker용 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.marker = self.create_publisher(Marker, 'visualization_marker', 10)
         
-        # 속성값
+        # ----- 속성값 --------
+        # 무게중심 위치
+        self.M = 25.0
         x = -0.1
         y = 0.0
         h = 0.135
         self.CoG_local = np.array([x, y, h])
+        # zmp service factor
         self.sf_lin = 4.0 # default = 1.0  # 선형 가속도 zmp service factor
         self.sf_ap = 2.0  # 회전 접선 가속도 zmp service factor
         self.sf_cr = 5.0  # 구심력 zp service factor
-        self.M = 25.0
+        # 제약(초기값)
         self.xu = 0.295
         self.xl = -0.295
         self.yu = 0.309
         self.yl = -0.309
+        # 속도,각속도,가속도,각가속도
         self.v_max = 0.26
         self.v_min = -0.26
         self.a_max = 0.52  # 0.26m/s를 0.5초에 도달
@@ -83,14 +103,47 @@ class BaseBroad(Node):
         self._last_mode_change = self.get_clock().now()
 
 
+        # static_broadcaster
         transforms = []
-        transforms.append(self.robot_broad("CoG", -0.1, 0.0, 0.135))
-        transforms.append(self.robot_broad("robot_FL", 0.297, -0.314, 0.0))
-        transforms.append(self.robot_broad("robot_FR", 0.297,  0.314, 0.0))
-        transforms.append(self.robot_broad("robot_RR", -0.297, 0.314, 0.0))
-        transforms.append(self.robot_broad("robot_RL", -0.297,-0.314, 0.0))
-        self.tf.sendTransform(transforms)   # static broad
-    
+        transforms.append(self.robot_broad("CoG","base", -0.1, 0.0, 0.135))
+        transforms.append(self.robot_broad("base","robot_FL",  0.297, -0.25, 0.0))# 폭 500(휠간거리)+ 118(세그먼트 폭)mm, 길이 593.8mm
+        transforms.append(self.robot_broad("base","robot_FR",  0.297,  0.25, 0.0))
+        transforms.append(self.robot_broad("base","robot_RR", -0.297,  0.25, 0.0))
+        transforms.append(self.robot_broad("base","robot_RL", -0.297, -0.25, 0.0))
+        transforms.append(self.robot_broad("track_Right","trackR_FL", 0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("track_Right","trackR_FR", 0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Right","trackR_RR",-0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Right","trackR_RL",-0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_FL", 0.297, -0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_FR", 0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_RR",-0.297,  0.059, 0.0))
+        transforms.append(self.robot_broad("track_Left","trackL_RL",-0.297, -0.059, 0.0))
+        self.tf.sendTransform(transforms)
+        # 지지면 업데이트
+        self._bounds_initialized = False
+        self._bounds_ema_alpha = 0.3  # 0~1, 작을수록 부드럽게
+        self._bounds_margin = 0.0     # m, 보수적 여유가 필요하면 0.01~0.02 추천
+
+    # ---- subscription ----
+    def callback_imu_track_R(self,msg):
+        self.qx_tr = msg.orientation.x
+        self.qy_tr = msg.orientation.y
+        self.qz_tr = msg.orientation.z
+        self.qw_tr = msg.orientation.w
+
+    def callback_imu_track_L(self,msg):
+        self.qx_tl = msg.orientation.x
+        self.qy_tl = msg.orientation.y
+        self.qz_tl = msg.orientation.z
+        self.qw_tl = msg.orientation.w
+
+    def callback_imu_base(self,msg):
+        self.qx = msg.orientation.x
+        self.qy = msg.orientation.y
+        self.qz = msg.orientation.z
+        self.qw = msg.orientation.w
+        self.broad_base()
+
     def callback_motor_state(self,msg):
         self.prev_vel = msg.linear.x
         self.prev_ang = msg.angular.z
@@ -99,15 +152,8 @@ class BaseBroad(Node):
         self.v_des = float(max(self.v_min, min(self.v_max, msg.linear.x)))
         self.w_des = float(max(self.w_min, min(self.w_max, msg.angular.z)))
         self.last_cmd_time = self.get_clock().now()
-
-    def callback_imu(self,msg):
-        self.qx = msg.orientation.x
-        self.qy = msg.orientation.y
-        self.qz = msg.orientation.z
-        self.qw = msg.orientation.w
-        self.broad_base()
-
-     
+    # ---- end subscription ----
+    # ---- broad ---- 
     def broad_base(self):                # tilted ground -> base (broadcaster)
 
         t = TransformStamped()
@@ -123,14 +169,54 @@ class BaseBroad(Node):
         t.transform.rotation.w = self.qw
 
         self.draw_marker("base","robtf", 1, -0.1, 0.0, 0.135, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 1.0, 0.0], 0.1)
+        self.broad_track_R()
+        self.broad_track_L()
         self.draw_rectangle_marker()
         self.draw_zmp_marker()
+            # ▼ 여기 추가: 트랙 꼭짓점들을 base로 정사영해서 xl/xu/yl/yu 갱신
+        self._update_support_polygon_bounds(
+            frames=["trackR_FL","trackR_FR","trackR_RR","trackR_RL",
+                    "trackL_FL","trackL_FR","trackL_RR","trackL_RL"],
+            ema_alpha=self._bounds_ema_alpha,
+            margin=self._bounds_margin
+        )
         self.tf_base.sendTransform(t)
 
-    def robot_broad(self, child, x, y, z):   # base -> support (static broadcaster)
+    def broad_track_R(self):          
+
         t = TransformStamped()
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = "base"
+        t.child_frame_id = "track_Right"
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = -0.25
+        t.transform.translation.z = 0.135
+        t.transform.rotation.x = -self.qy_tr
+        t.transform.rotation.y = -self.qx_tr
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = self.qw_tr
+
+        self.tf_track_r.sendTransform(t)
+    def broad_track_L(self):          
+
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = "base"
+        t.child_frame_id = "track_Left"
+        t.transform.translation.x = 0.0
+        t.transform.translation.y = 0.25
+        t.transform.translation.z = 0.135
+        t.transform.rotation.x = -self.qy_tl
+        t.transform.rotation.y = -self.qx_tl
+        t.transform.rotation.z = 0.0
+        t.transform.rotation.w = self.qw_tl
+
+        self.tf_track_l.sendTransform(t)
+
+    def robot_broad(self, parent, child, x, y, z):   # base -> support (static broadcaster)
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = parent
         t.child_frame_id = child
         t.transform.translation.x = x
         t.transform.translation.y = y
@@ -167,7 +253,7 @@ class BaseBroad(Node):
         self.marker.publish(m)
 
     def draw_rectangle_marker(self):
-        names = ["robot_FL", "robot_FR", "robot_RR", "robot_RL", "robot_FL"]  # 직사각형 
+        names = ["trackR_FL", "trackR_RL", "trackL_RR", "trackL_FR", "trackR_FL"]  # 직사각형 
         points = []
         for name in names:
             try:
@@ -242,9 +328,83 @@ class BaseBroad(Node):
         x_zmp_local = self.x_nf - h * (CoG_a_local[0] + a_c_local[0]) / abs(self.g_local[2])
         y_zmp_local = self.y_nf - h * (CoG_a_local[1] + a_c_local[1] + circle_ac_local[1]) / abs(self.g_local[2])
         zmp_local = np.array([x_zmp_local, y_zmp_local, 0.0])
-
         self.draw_marker("base","zmp", 200, zmp_local[0], zmp_local[1], 0.0, [0., 0., 0., 1.], Marker.SPHERE, [0.0, 0.0, 1.0], 0.07)
+   
+    # ─────────────────────────────────────────────────────────────
+    # ▼▼▼ 추가: 정사영 경계 갱신 함수들 (xu/xl/yu/yl 동적 업데이트) ▼▼▼
+    # ─────────────────────────────────────────────────────────────
+    def _lookup_xy_in_base(self, frame: str):
+        """frame(꼭짓점 프레임)의 위치를 base 프레임으로 가져와 (x,y)만 반환 (정사영)."""
+        try:
+            tf = self.tf_buffer.lookup_transform("base", frame, rp.time.Time(),
+                                                 timeout=rclpyDuration(seconds=0.2))
+            t = tf.transform.translation
+            return float(t.x), float(t.y)  # z는 정사영이므로 무시
+        except Exception as e:
+            self.get_logger().warn(f"TF lookup failed for {frame}: {e}")
+            return None
 
+    def _publish_bounds_marker(self, xl, xu, yl, yu, ns="proj_rect", mid=77):
+        """xl,xu,yl,yu로부터 직사각형 LINE_STRIP 마커 발행 (base z=0 정사영)."""
+        m = Marker()
+        m.header.frame_id = "base"
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.ns = ns
+        m.id = mid
+        m.type = Marker.LINE_STRIP
+        m.action = Marker.ADD
+        m.scale.x = 0.02
+        m.color.r = 0.0
+        m.color.g = 1.0
+        m.color.b = 1.0
+        m.color.a = 1.0
+        m.pose.orientation.w = 1.0
+
+        corners = [(xu, yl), (xu, yu), (xl, yu), (xl, yl), (xu, yl)]
+        m.points = [Point(x=x, y=y, z=0.0) for (x,y) in corners]
+        self.marker.publish(m)
+
+    def _update_support_polygon_bounds(self, frames, ema_alpha=0.3, margin=0.0):
+        """
+        frames: 꼭짓점 프레임 이름 리스트
+        ema_alpha: 0~1, 지수평활 계수 (작을수록 부드럽게)
+        margin: 경계 여유(m)
+        """
+        pts = []
+        for f in frames:
+            p = self._lookup_xy_in_base(f)
+            if p is not None:
+                pts.append(p)
+
+        if len(pts) < 3:
+            # 점이 부족하면 갱신 스킵
+            return False
+
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        xl_new = min(xs) - margin
+        xu_new = max(xs) + margin
+        yl_new = min(ys) - margin
+        yu_new = max(ys) + margin
+
+        if not self._bounds_initialized:
+            self.xl, self.xu, self.yl, self.yu = xl_new, xu_new, yl_new, yu_new
+            self._bounds_initialized = True
+        else:
+            self.xl = (1-ema_alpha)*self.xl + ema_alpha*xl_new
+            self.xu = (1-ema_alpha)*self.xu + ema_alpha*xu_new
+            self.yl = (1-ema_alpha)*self.yl + ema_alpha*yl_new
+            self.yu = (1-ema_alpha)*self.yu + ema_alpha*yu_new
+
+        # 시각화
+        self._publish_bounds_marker(self.xl, self.xu, self.yl, self.yu)
+        return True
+    # ─────────────────────────────────────────────────────────────
+    # ▲▲▲ 추가 끝 ▲▲▲
+    # ─────────────────────────────────────────────────────────────
+
+
+    
     # 선형 운동시 선형 가속도에 의한 zmp x축
     def lin_accel_bounds(self):
 
