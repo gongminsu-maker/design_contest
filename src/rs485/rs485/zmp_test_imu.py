@@ -44,7 +44,9 @@ class BaseBroad(Node):
         y = 0.0
         h = 0.135
         self.CoG_local = np.array([x, y, h])
-        self.sf = 3.0 # default = 1.0 
+        self.sf_lin = 4.0 # default = 1.0  # 선형 가속도 zmp service factor
+        self.sf_ap = 4.0  # 회전 접선 가속도 zmp service factor
+        self.sf_cr = 5.0  # 구심력 zp service factor
         self.M = 25.0
         self.xu = 0.295
         self.xl = -0.295
@@ -262,21 +264,21 @@ class BaseBroad(Node):
         # Sau,Sal이 1일 때가 zmp의 경계가 polygon에 접하는 순간
         # 안전계수(self.sf)를 곱해 커스텀 가능
 
-        if Sau >= 1*self.sf and Sal >= 1*self.sf:
+        if Sau >= 1*self.sf_lin and Sal >= 1*self.sf_lin:
             a_lower = self.a_min
             a_upper = self.a_max
             self.get_logger().info(f"[선형 안정], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
-        elif Sau >0 and Sau <1*self.sf and Sal >= self.sf:
-            a_lower = (2/self.sf)*(0.5*self.sf-min(Sau,1*self.sf))*self.a_max
+        elif Sau >0 and Sau <1*self.sf_lin and Sal >= self.sf_lin:
+            a_lower = (2/self.sf_lin)*(0.5*self.sf_lin-min(Sau,1*self.sf_lin))*self.a_max
             a_upper = self.a_max
             self.get_logger().warn(f"[선형 감속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
-        elif Sau >= 1*self.sf and Sal > 0 and Sal < 1*self.sf :
+        elif Sau >= 1*self.sf_lin and Sal > 0 and Sal < 1*self.sf_lin :
             a_lower = self.a_min
-            a_upper = (2/self.sf)*(min(Sal,1*self.sf)-0.5*self.sf)*self.a_max
+            a_upper = (2/self.sf_lin)*(min(Sal,1*self.sf_lin)-0.5*self.sf_lin)*self.a_max
             self.get_logger().warn(f"[선형 가속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
-        elif Sau >0 and Sau < 1*self.sf and Sal > 0 and Sal <1*self.sf:
-            a_lower = (2/self.sf)*(0.5*self.sf-min(Sau,1*self.sf))*self.a_max
-            a_upper = (2/self.sf)*(min(Sal,1*self.sf)-0.5*self.sf)*self.a_max
+        elif Sau >0 and Sau < 1*self.sf_lin and Sal > 0 and Sal <1*self.sf_lin:
+            a_lower = (2/self.sf_lin)*(0.5*self.sf_lin-min(Sau,1*self.sf_lin))*self.a_max
+            a_upper = (2/self.sf_lin)*(min(Sal,1*self.sf_lin)-0.5*self.sf_lin)*self.a_max
             self.get_logger().warn(f"[선형 가감속 제약], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         else:
             a_lower = 0.0
@@ -298,22 +300,22 @@ class BaseBroad(Node):
         Sapu = (1 - (g_local[2]*(y_nf - self.yu))/(self.alpha_max*self.CoG_local[2]))/2 # 양의 각가속도
         Sapl = (1 + (g_local[2]*(y_nf - self.yl))/(self.alpha_max*self.CoG_local[2]))/2 # 음의 각가속도
 
-        if Sapu >= 1*self.sf and Sapl >= 1*self.sf:
+        if Sapu >= 1*self.sf_ap and Sapl >= 1*self.sf_ap:
             alpha_lower = self.alpha_min
             alpha_upper = self.alpha_max
             self.get_logger().info(f"[회전 접선 안정], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
-        elif Sapu >0 and Sapu <1*self.sf and Sapl >= 1*self.sf:
+        elif Sapu >0 and Sapu <1*self.sf_ap and Sapl >= 1*self.sf_ap:
             alpha_lower = self.alpha_min
-            alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
+            alpha_upper = (2/self.sf_ap)*(min(Sapu,1*self.sf_ap)-0.5*self.sf_ap)*self.alpha_max
 
             self.get_logger().warn(f"[양의 회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
-        elif Sapu >= 1*self.sf and Sapl > 0 and Sapl < 1*self.sf :
-            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
+        elif Sapu >= 1*self.sf_ap and Sapl > 0 and Sapl < 1*self.sf_ap :
+            alpha_lower = (2/self.sf_ap)*(0.5*self.sf_ap-min(Sapl,1*self.sf_ap))*self.alpha_max
             alpha_upper = self.alpha_max
             self.get_logger().warn(f"[음의 회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
-        elif Sapu >0 and Sapu < 1*self.sf and Sapl > 0 and Sapl <1*self.sf:
-            alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
-            alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
+        elif Sapu >0 and Sapu < 1*self.sf_ap and Sapl > 0 and Sapl <1*self.sf_ap:
+            alpha_lower = (2/self.sf_ap)*(0.5*self.sf_ap-min(Sapl,1*self.sf_ap))*self.alpha_max
+            alpha_upper = (2/self.sf_ap)*(min(Sapu,1*self.sf_ap)-0.5*self.sf_ap)*self.alpha_max
             self.get_logger().warn(f"[양,음의회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         else:
             alpha_lower = 0.0
@@ -341,11 +343,11 @@ class BaseBroad(Node):
         Sw = Swl # 구심가속도는 하한에만 영향이 있음
 
 
-        if Sw >= 1*self.sf: 
+        if Sw >= 1*self.sf_cr: 
             circle_ac = self.circle_ac_max
             self.get_logger().info(f"[회전 구심력 안정], Sw: {Sw},circle_ac: {circle_ac}") 
-        elif Sw >0 and Sw <1*self.sf: 
-            circle_ac = max(0.0,(2/self.sf)*(min(Sw,1*self.sf)-0.5*self.sf)*self.circle_ac_max)
+        elif Sw >0 and Sw <1*self.sf_cr: 
+            circle_ac = max(0.0,(2/self.sf_cr)*(min(Sw,1*self.sf_cr)-0.5*self.sf_cr)*self.circle_ac_max)
             self.get_logger().warn(f"[회전 속도 제약], Sw: {Sw},circle_ac: {circle_ac}")
         else:
             circle_ac = 0.0
