@@ -277,7 +277,7 @@ class BaseBroad(Node):
     
     # 회전운동시 회전접선가속도에 의한 y축 zmp
     def alpha_bounds(self):
-
+        self.get_logger().info("alpha받음")
         # 예외처리
         try: 
             g_local = self.g_local
