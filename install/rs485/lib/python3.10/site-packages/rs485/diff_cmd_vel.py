@@ -89,10 +89,10 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_R = 0x00 # 전진
+                self.direction_R = 0x01 # 전진
 
             else: 
-                self.direction_R = 0x01 # 후진
+                self.direction_R = 0x00 # 후진
         else:
             self.direction_R = 0x00
 
@@ -103,10 +103,10 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_L = 0x01 # 전진
+                self.direction_L = 0x00 # 전진
 
             else:
-                self.direction_L = 0x00 # 후진
+                self.direction_L = 0x01 # 후진
         else:
             self.direction_L = 0x00
 
@@ -178,8 +178,8 @@ class MotorControllerNode(Node):
     def motor_control(self,msg):
         lin_v = float(msg.linear.x)
         ang_v = float(msg.angular.z)
-        vel_r = lin_v - ang_v*self.L/2    # 속도 분배
-        vel_l = lin_v + ang_v*self.L/2
+        vel_r = lin_v + ang_v*self.L/2    # 속도 분배
+        vel_l = lin_v - ang_v*self.L/2
         self.cal_speed_R(vel_r)
         self.cal_speed_L(vel_l)
         
@@ -194,7 +194,7 @@ class MotorControllerNode(Node):
         self.send_motor_command()
 
     def send_motor_command(self):
-        # 프로토콜 구성
+        # 프로토콜 구
         data_size = 0x06
         mode = 0x03   
         time_to_reach = 0x05  # 0x05 = 0.5초
@@ -239,18 +239,19 @@ class MotorControllerNode(Node):
         m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 (속도 크기만 수신됨, 부호 X => 부호 변환해주어야함)
         m_vel_L = self.speed_L_RX*(2*m.pi/60)*self.radius
 
-        if self.direct_R_RX == 0x00:
+        if self.direct_R_RX == 0x01:
             motor_vel_R = m_vel_R
         else:
             motor_vel_R = -m_vel_R
 
-        if self.direct_L_LX ==0x01:
+        if self.direct_L_LX ==0x00:
             motor_vel_L = m_vel_L
         else:
             motor_vel_L = -m_vel_L
+            
         self.get_logger().info(f"R_RX{self.speed_R_RX}, L_LX{self.speed_L_RX}")
         m_vel = (motor_vel_R + motor_vel_L)/2    # 선속도
-        m_ang = (-motor_vel_R + motor_vel_L)/(self.width)
+        m_ang = (motor_vel_R - motor_vel_L)/(self.width)
         motor.linear.x = m_vel
         motor.angular.z = m_ang
         self.pub.publish(motor)

@@ -58,7 +58,7 @@ class BaseBroad(Node):
         self.w_min = -1.04
         self.alpha_max = 2.08 # 1.04rad/s를 0.5초에 도달
         self.alpha_min = -2.08
-        self.circle_ac_max = self.w_max*self.w_max*abs(x)
+        self.circle_ac_max = self.w_max*self.w_max*abs(x) # 구심력
         self.del_t = 0.5    # re_cmd_vel의 주기와 동일
 
         # 초기값
@@ -68,7 +68,7 @@ class BaseBroad(Node):
         self.alpha_drive = 0.0
         self.v_des = 0.0
         self.w_des = 0.0
-        self.cmd_timeout = 1.0
+        self.cmd_timeout = 2.0
         self.last_cmd_time = self.get_clock().now()
 
 
@@ -247,8 +247,8 @@ class BaseBroad(Node):
 
         # stability index
         # 
-        Sau = (1- (g_local[2]*(x_nf - self.xu))/(self.a_max*self.CoG_local[2]))/2
-        Sal = (1+ (g_local[2]*(x_nf - self.xl))/(self.a_max*self.CoG_local[2]))/2
+        Sau = (1- (g_local[2]*(x_nf - self.xu))/(self.a_max*self.CoG_local[2]))/2  #음의 선형 가속도
+        Sal = (1+ (g_local[2]*(x_nf - self.xl))/(self.a_max*self.CoG_local[2]))/2  #양의 선형 가속도
 
         # Sau,Sal이 1일 때가 zmp의 경계가 polygon에 접하는 순간
         # 안전계수(self.sf)를 곱해 커스텀 가능
@@ -256,7 +256,7 @@ class BaseBroad(Node):
         if Sau >= 1*self.sf and Sal >= 1*self.sf:
             a_lower = self.a_min
             a_upper = self.a_max
-            self.get_logger().warn(f"[선형 안정], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
+            self.get_logger().info(f"[선형 안정], Sau: {Sau}, Sal: {Sal}, a_lower: {a_lower}, a_upper: {a_upper}")
         elif Sau >0 and Sau <1*self.sf and Sal >= self.sf:
             a_lower = (2/self.sf)*(0.5*self.sf-min(Sau,1*self.sf))*self.a_max
             a_upper = self.a_max
@@ -286,67 +286,72 @@ class BaseBroad(Node):
             y_nf = self.CoG_local[1]
 
         # stability index
-        Sapu = (1- (g_local[2]*(y_nf - self.yu))/(self.alpha_max*self.CoG_local[2]))/2
-        Sapl = (1+ (g_local[2]*(y_nf - self.yl))/(self.alpha_max*self.CoG_local[2]))/2
+        Sapu = (1 - (g_local[2]*(y_nf - self.yu))/(self.alpha_max*self.CoG_local[2]))/2 # 양의 각가속도
+        Sapl = (1 + (g_local[2]*(y_nf - self.yl))/(self.alpha_max*self.CoG_local[2]))/2 # 음의 각가속도
 
         if Sapu >= 1*self.sf and Sapl >= 1*self.sf:
             alpha_lower = self.alpha_min
             alpha_upper = self.alpha_max
-            self.get_logger().warn(f"[회전 접선 안정], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
+            self.get_logger().info(f"[회전 접선 안정], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >0 and Sapu <1*self.sf and Sapl >= 1*self.sf:
             alpha_lower = self.alpha_min
             alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
-            self.get_logger().warn(f"[회전 접선감속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
+
+            self.get_logger().warn(f"[양의 회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >= 1*self.sf and Sapl > 0 and Sapl < 1*self.sf :
             alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
             alpha_upper = self.alpha_max
-            self.get_logger().warn(f"[회전 접선 가속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
+            self.get_logger().warn(f"[음의 회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         elif Sapu >0 and Sapu < 1*self.sf and Sapl > 0 and Sapl <1*self.sf:
             alpha_lower = (2/self.sf)*(0.5*self.sf-min(Sapl,1*self.sf))*self.alpha_max
             alpha_upper = (2/self.sf)*(min(Sapu,1*self.sf)-0.5*self.sf)*self.alpha_max
-            self.get_logger().warn(f"[회전 접선 가감속 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
+            self.get_logger().warn(f"[양,음의회전 접선 가속도 제약], Sapu: {Sapu}, Sapl: {Sapl}, alpha_lower: {alpha_lower}, alpha_upper: {alpha_upper}")
         else:
             alpha_lower = 0.0
             alpha_upper = 0.0
             self.get_logger().warn(f"[전복], Sapu: {Sapu}, Sapl: {Sapl}")
-        return alpha_lower, alpha_upper, Sapu, Sapl
+            w_lower,w_upper, Sw = 0.0,0.0,1.0
+            return w_lower, w_upper, Sw, alpha_lower, alpha_upper,Sapu, Sapl
+            
+        w_lower,w_upper, Sw, _, _, _, _  = self.w_bounds(alpha_lower, alpha_upper, Sapu, Sapl)
+        return w_lower, w_upper, Sw, alpha_lower, alpha_upper, Sapu, Sapl
     
-    # # 회전운동시 구심가속도에 의한 x축 zmp
-    # def w_bounds(self):
+    # 회전운동시 구심가속도에 의한 x축 zmp
+    def w_bounds(self,alpha_lower,alpha_upper,Sapu,Sapl):
 
-    #     # 예외처리
-    #     try: 
-    #         g_local = self.g_local
-    #         x_nf = self.x_nf
-    #     except AttributeError:
-    #         g_local = np.array([0.0,0.0,9.8])
-    #         x_nf = self.CoG_local[0]
+        # 예외처리
+        try: 
+            g_local = self.g_local
+            x_nf = self.x_nf
+        except AttributeError:
+            g_local = np.array([0.0,0.0,9.8])
+            x_nf = self.CoG_local[0]
 
-    #     # stability index
-    #     Swl = (1+ (abs(g_local[2])*(x_nf - self.xl))/(self.circle_ac_max*self.CoG_local[2]))/2
-    #     Sw = Swl # 구심가속도는 하한에만 영향이 있음
+        # stability index
+        Swl = (1+ (abs(g_local[2])*(x_nf - self.xl))/(self.circle_ac_max*self.CoG_local[2]))/2
+        Sw = Swl # 구심가속도는 하한에만 영향이 있음
 
 
-    #     if Sw >= 1*self.sf: 
-    #         circle_ac = self.circle_ac_max
-    #         self.get_logger().warn(f"[회전 구심 안정], Sw: {Sw},circle_ac: {circle_ac}") 
-    #     elif Sw >0 and Sw <1*self.sf: 
-    #         circle_ac = max(0,(2/self.sf)*(0.5*self.sf-min(Sw,1*self.sf))*self.circle_ac_max)
-    #         self.get_logger().warn(f"[회전 구심 제약], Sw: {Sw},circle_ac: {circle_ac}")
-    #     else:
-    #         circle_ac = 0.0
-    #         self.get_logger().warn(f"[전복], Sw: {Sw}")
-    #     w_lower = max(self.w_min,-math.sqrt(circle_ac/abs(self.CoG_local[0])))
-    #     w_upper = min(self.w_max,math.sqrt(circle_ac/abs(self.CoG_local[0])))
-    #     return w_lower, w_upper, Sw
+        if Sw >= 1*self.sf: 
+            circle_ac = self.circle_ac_max
+            self.get_logger().info(f"[회전 구심력 안정], Sw: {Sw},circle_ac: {circle_ac}") 
+        elif Sw >0 and Sw <1*self.sf: 
+            circle_ac = max(0.0,(2/self.sf)*(min(Sw,1*self.sf)-0.5*self.sf)*self.circle_ac_max)
+            self.get_logger().warn(f"[회전 속도 제약], Sw: {Sw},circle_ac: {circle_ac}")
+        else:
+            circle_ac = 0.0
+            self.get_logger().warn(f"[전복], Sw: {Sw}")
+        w_lower = max(self.w_min,-math.sqrt(circle_ac/abs(self.CoG_local[0])))
+        w_upper = min(self.w_max,math.sqrt(circle_ac/abs(self.CoG_local[0])))
+        return w_lower, w_upper, Sw, alpha_lower,alpha_upper,Sapu,Sapl
     
     def re_cmd_vel(self):
         now = self.get_clock().now()
-        # 1.0초동안 cmd_vel명령 없을 시 정지
+        # timout동안 cmd_vel명령 없을 시 정지
         if (now - self.last_cmd_time).nanoseconds*1e-9 > self.cmd_timeout:
             self.v_des = 0.0
             self.w_des = 0.0
-
+        # 선형 운동
         a_cmd = (self.v_des - self.prev_vel) / self.del_t
         a_lower, a_upper, Sau, Sal = self.lin_accel_bounds()
 
@@ -356,16 +361,17 @@ class BaseBroad(Node):
             self.a_drive = max(a_lower, min(a_upper, a_cmd))
             ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
         re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
-
+        # 선회 운동
         alpha_cmd = (self.w_des - self.prev_ang) / self.del_t
-        alpha_lower, alpha_upper, Sapu, Sapl = self.alpha_bounds()
+        w_lower, w_upper, Sw, alpha_lower,alpha_upper, Sapu, Sapl = self.alpha_bounds()
         if Sapu < 0 or Sapl < 0:
             ugv_ang_vel = 0.0 # 전복시 모터 멈춤
+        elif Sw < 0:
+            ugv_ang_vel = 0.0
         else: 
-        #w_lower, w_upper, Sw = self.w_bounds()
             self.alpha_drive = max(alpha_lower, min(alpha_upper, alpha_cmd))
             ugv_ang_vel = self.prev_ang + self.alpha_drive * self.del_t
-        re_ang_vel = max(self.w_min, min(self.w_max,ugv_ang_vel)) # alpha와 w의 zmp제한 교집합
+        re_ang_vel = max(w_lower, min(w_upper,ugv_ang_vel)) # alpha와 w의 zmp제한 교집합
         
 
         v= Twist()

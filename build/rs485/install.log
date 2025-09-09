@@ -40,6 +40,7 @@
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485/__pycache__/imu_pub.cpython-310.pyc
 /home/gongminsu/motor_test/install/rs485/share/ament_index/resource_index/packages/rs485
 /home/gongminsu/motor_test/install/rs485/share/rs485/package.xml
+/home/gongminsu/motor_test/install/rs485/share/rs485/launch/zmp_controller.launch.py
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info/top_level.txt
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info/zip-safe
 /home/gongminsu/motor_test/install/rs485/lib/python3.10/site-packages/rs485-0.0.0-py3.10.egg-info/SOURCES.txt

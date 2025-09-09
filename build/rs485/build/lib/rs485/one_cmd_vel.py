@@ -35,6 +35,7 @@ class MotorControllerNode(Node):
         self.header = [0xFF, 0xFE]
         self.motor_id = 0x00
         self.direction_R = 0x00
+        self.direct_R_RX == 0x00
 
         # 피드백 요청 timer
         self.timer_request = self.create_timer(0.05, self.request_feedback) #20HZ  motor_state publisher보다 빠르게 설정
@@ -102,6 +103,8 @@ class MotorControllerNode(Node):
                         self.get_logger().warn("[RX_R] Payload too short; skipping")
                         continue
                     speed_rpm_01 = ((payload[3] << 8) | payload[4] ) * 0.1
+                    direct = payload[2]
+                    self.direct_R_RX = direct
                     # pos랑 전류는 필요하면 사용
                     # pos_deg_01 = ((payload[5] << 8) | payload[6]) * 0.1
                     # current_A_01 = payload[7] * 0.1
@@ -155,10 +158,16 @@ class MotorControllerNode(Node):
     def motor_state(self):
         motor = Twist()
         m_vel_R = self.speed_R_RX*(2*m.pi/60)*self.radius  # rpm -> m/s로 변환 
+
+        if self.direct_R_RX == 0x00:
+            motor_vel_R = m_vel_R
+        else:
+            motor_vel_R = -m_vel_R
+
         m_vel_L = 0.0
         self.get_logger().info(f"R_RX{self.speed_R_RX}")
-        m_vel = (m_vel_R + m_vel_L)/2    # 선속도
-        m_ang = (m_vel_R - m_vel_L)/(self.width)
+        m_vel = (motor_vel_R + m_vel_L)/2    # 선속도
+        m_ang = (motor_vel_R - m_vel_L)/(self.width)
         motor.linear.x = m_vel
         motor.angular.z = m_ang
         self.pub.publish(motor)

@@ -40,7 +40,6 @@ class ImuSerialPublisher(Node):
         self.pub_base_roll = self.create_publisher(Float32, 'base/roll/imu/data',10)
         self.pub_base_pitch = self.create_publisher(Float32, 'base/pitch/imu/data',10)
         self.pub_base_yaw = self.create_publisher(Float32, 'base/yaw/imu/data',10)
-
         self.pub_track_r = self.create_publisher(Imu, '/track_right/imu/data', 10)
         self.pub_track_l = self.create_publisher(Imu, '/track_left/imu/data', 10)
 

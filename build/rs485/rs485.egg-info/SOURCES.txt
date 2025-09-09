@@ -8,6 +8,7 @@ setup.py
 ../../build/rs485/rs485.egg-info/requires.txt
 ../../build/rs485/rs485.egg-info/top_level.txt
 ../../build/rs485/rs485.egg-info/zip-safe
+launch/zmp_controller.launch.py
 resource/rs485
 rs485/TSS_test.py
 rs485/__init__.py
