@@ -89,10 +89,10 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_R = 0x00 # 전진
+                self.direction_R = 0x01 # 전진
 
             else: 
-                self.direction_R = 0x01 # 후진
+                self.direction_R = 0x00 # 후진
         else:
             self.direction_R = 0x00
 
@@ -103,10 +103,10 @@ class MotorControllerNode(Node):
         rpm = round((v/self.radius)*(60/(2*m.pi)),1)   # rpm변환 소수점 첫째자리 반올림 (0.1rpm단위이기 때문에)
         if v != 0:
             if v > 0:
-                self.direction_L = 0x01 # 전진
+                self.direction_L = 0x00 # 전진
 
             else:
-                self.direction_L = 0x00 # 후진
+                self.direction_L = 0x01 # 후진
         else:
             self.direction_L = 0x00
 
@@ -178,8 +178,8 @@ class MotorControllerNode(Node):
     def motor_control(self,msg):
         lin_v = float(msg.linear.x)
         ang_v = float(msg.angular.z)
-        vel_r = lin_v - ang_v*self.L/2    # 속도 분배
-        vel_l = lin_v + ang_v*self.L/2
+        vel_r = lin_v + ang_v*self.L/2    # 속도 분배
+        vel_l = lin_v - ang_v*self.L/2
         self.cal_speed_R(vel_r)
         self.cal_speed_L(vel_l)
         
