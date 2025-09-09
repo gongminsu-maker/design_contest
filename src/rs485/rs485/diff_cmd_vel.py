@@ -26,7 +26,7 @@ class MotorControllerNode(Node):
 
         # serial setting
         self.ser_R = serial.Serial(
-            port='/dev/ttyUSB1',         # 적절한 포트로 수정 (ls /dev/ttyUSB*을 통해 포트번호 확인하기), **Right 먼저 시리얼 포트에 끼기**
+            port='/dev/ttyUSB0',         # 적절한 포트로 수정 (ls /dev/ttyUSB*을 통해 포트번호 확인하기), **Right 먼저 시리얼 포트에 끼기**
             baudrate=115200,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
@@ -34,7 +34,7 @@ class MotorControllerNode(Node):
             timeout=1
         )
         self.ser_L = serial.Serial(
-           port="/dev/ttyUSB0",
+           port="/dev/ttyUSB1",
            baudrate=115200,
            bytesize=serial.EIGHTBITS,
            parity=serial.PARITY_NONE,
