@@ -44,7 +44,7 @@ class BaseBroad(Node):
         y = 0.0
         h = 0.135
         self.CoG_local = np.array([x, y, h])
-        self.sf = 2.0 # default = 1.0 
+        self.sf = 3.0 # default = 1.0 
         self.M = 25.0
         self.xu = 0.295
         self.xl = -0.295
@@ -70,6 +70,15 @@ class BaseBroad(Node):
         self.w_des = 0.0
         self.cmd_timeout = 2.0
         self.last_cmd_time = self.get_clock().now()
+
+        # --- 모드 게이팅용 임계값/히스테리시스 ---
+
+        self.v_eps   = 0.02     # m/s, 직진 의도 최소치
+        self.w_eps   = 0.10     # rad/s, 선회 의도 최소치
+        self.mode_delta = 0.10  # 정규화 스코어 차이로 모드 결정 여유 (0~1)
+        self.motion_mode = "IDLE"   # ["IDLE","LINEAR","TURN"]
+        self.mode_hold_s = 0.5      # 모드 유지 최소 시간(플리커 방지)
+        self._last_mode_change = self.get_clock().now()
 
 
         transforms = []
@@ -344,37 +353,87 @@ class BaseBroad(Node):
         w_lower = max(self.w_min,-math.sqrt(circle_ac/abs(self.CoG_local[0])))
         w_upper = min(self.w_max,math.sqrt(circle_ac/abs(self.CoG_local[0])))
         return w_lower, w_upper, Sw, alpha_lower,alpha_upper,Sapu,Sapl
-    
+    def _select_motion_mode(self):
+        """/cmd_vel 의 v_des, w_des로부터 모드 결정 (히스테리시스 포함)"""
+        now = self.get_clock().now()
+        hold = (now - self._last_mode_change).nanoseconds * 1e-9 < self.mode_hold_s
+
+        vmag = abs(self.v_des)
+        wmag = abs(self.w_des)
+
+        if vmag < self.v_eps and wmag < self.w_eps:
+            new_mode = "IDLE"
+        else:
+            # 정규화 스코어 (0~1): 누가 '더 강한 명령'인지 비교
+            sv = vmag / max(self.v_max, 1e-6)
+            sw = wmag / max(self.w_max, 1e-6)
+            if sv - sw > self.mode_delta:
+                new_mode = "LINEAR"
+            elif sw - sv > self.mode_delta:
+                new_mode = "TURN"
+            else:
+                # 경계 영역에서는 기존 모드 유지(플리커 방지),
+                # 기존이 IDLE이면 우선순위: (TURN if sw>=sv else LINEAR)
+                if hold:
+                    new_mode = self.motion_mode
+                else:
+                    new_mode = "TURN" if sw >= sv else "LINEAR"
+
+        if new_mode != self.motion_mode:
+            self.motion_mode = new_mode
+            self._last_mode_change = now
+            self.get_logger().info(f"[mode] → {self.motion_mode}")
+
     def re_cmd_vel(self):
         now = self.get_clock().now()
-        # timout동안 cmd_vel명령 없을 시 정지
         if (now - self.last_cmd_time).nanoseconds*1e-9 > self.cmd_timeout:
             self.v_des = 0.0
             self.w_des = 0.0
-        # 선형 운동
+
+        # 1) 모드 결정
+        self._select_motion_mode()
+
+        # 2) 선형 속도 처리 (모드에 따라 제약 분리)
         a_cmd = (self.v_des - self.prev_vel) / self.del_t
-        a_lower, a_upper, Sau, Sal = self.lin_accel_bounds()
 
-        if Sau < 0 or Sal < 0:
-            ugv_lin_vel = 0.0  # 전복시 모터 멈춤
+        if self.motion_mode in ("LINEAR", "IDLE"):
+            # ── LINEAR 모드: 선형 ZMP 제약만 적용 ──
+            a_lower, a_upper, Sau, Sal = self.lin_accel_bounds()
+            if Sau < 0 or Sal < 0:
+                ugv_lin_vel = 0.0
+            else:
+                self.a_drive = max(a_lower, min(a_upper, a_cmd))
+                ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
+            re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
         else:
-            self.a_drive = max(a_lower, min(a_upper, a_cmd))
-            ugv_lin_vel = self.prev_vel + self.a_drive * self.del_t
-        re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
-        # 선회 운동
-        alpha_cmd = (self.w_des - self.prev_ang) / self.del_t
-        w_lower, w_upper, Sw, alpha_lower,alpha_upper, Sapu, Sapl = self.alpha_bounds()
-        if Sapu < 0 or Sapl < 0:
-            ugv_ang_vel = 0.0 # 전복시 모터 멈춤
-        elif Sw < 0:
-            ugv_ang_vel = 0.0
-        else: 
-            self.alpha_drive = max(alpha_lower, min(alpha_upper, alpha_cmd))
-            ugv_ang_vel = self.prev_ang + self.alpha_drive * self.del_t
-        re_ang_vel = max(w_lower, min(w_upper,ugv_ang_vel)) # alpha와 w의 zmp제한 교집합
-        
+            # ── TURN 모드: 선형 제약 비활성(명령은 0으로 끌어내림만) ──
+            # 모터/안전상 급감 피하려면 a_max로만 감쇠
+            a_soft = max(self.a_min, min(self.a_max, (0.0 - self.prev_vel) / self.del_t))
+            ugv_lin_vel = self.prev_vel + a_soft * self.del_t
+            re_cmd_vel = max(self.v_min, min(self.v_max, ugv_lin_vel))
 
-        v= Twist()
+        # 3) 각속도 처리 (모드에 따라 제약 분리)
+        alpha_cmd = (self.w_des - self.prev_ang) / self.del_t
+
+        if self.motion_mode == "TURN":
+            # ── TURN 모드: 회전(접선→구심) ZMP 제약 적용 ──
+            w_lower, w_upper, Sw, alpha_lower, alpha_upper, Sapu, Sapl = self.alpha_bounds()
+            if (Sapu <= 0) or (Sapl <= 0) or (Sw < 0):
+                re_ang_vel = 0.0
+            else:
+                self.alpha_drive = max(alpha_lower, min(alpha_upper, alpha_cmd))
+                ugv_ang_vel = self.prev_ang + self.alpha_drive * self.del_t
+                re_ang_vel = max(w_lower, min(w_upper, ugv_ang_vel))
+        else:
+            # ── LINEAR/IDLE 모드: 회전 ZMP 제약 비활성, 단 '0으로 감속'만 수행 ──
+            # (안전상 필요하면 여기서도 alpha_bounds()로 감속만 제한하도록 바꿔도 됨)
+            alpha_soft = max(self.alpha_min, min(self.alpha_max, (0.0 - self.prev_ang) / self.del_t))
+            ugv_ang_vel = self.prev_ang + alpha_soft * self.del_t
+            # TURN 모드가 아니므로 w 한계는 엔지니어링 리미트만 사용
+            re_ang_vel = max(self.w_min, min(self.w_max, ugv_ang_vel))
+
+        # 4) 퍼블리시
+        v = Twist()
         v.linear.x = re_cmd_vel
         v.angular.z = re_ang_vel
         self.pub.publish(v)
