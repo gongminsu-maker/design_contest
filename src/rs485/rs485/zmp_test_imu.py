@@ -45,7 +45,7 @@ class BaseBroad(Node):
         h = 0.135
         self.CoG_local = np.array([x, y, h])
         self.sf_lin = 4.0 # default = 1.0  # 선형 가속도 zmp service factor
-        self.sf_ap = 4.0  # 회전 접선 가속도 zmp service factor
+        self.sf_ap = 2.0  # 회전 접선 가속도 zmp service factor
         self.sf_cr = 5.0  # 구심력 zp service factor
         self.M = 25.0
         self.xu = 0.295
